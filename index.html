@@ -881,12 +881,10 @@ function renderConfirm(type) {
     <form onsubmit="return false;">
       <div class="form-group">
         <label for="tool-input">
-          ${isWebsite ? "Sheet ID or Website URL" : "Keywords List"}
-          <span class="label-hint">${isWebsite ? "Paste Google Sheet ID / URL" : "Comma separated"}</span>
+          ${isWebsite ? "Sheet ID or Website URL" : "Sheet ID or Keywords List"}
+          <span class="label-hint">${isWebsite ? "Paste Google Sheet ID / URL" : "Paste Sheet ID or comma-separated keywords"}</span>
         </label>
-        ${isWebsite
-          ? `<input type="text" id="tool-input" placeholder="e.g. 1NEymr4St_ZgL5UUW... or https://example.com">`
-          : `<textarea id="tool-input" rows="3" placeholder="keyword one, keyword two, keyword three"></textarea>`}
+        <input type="text" id="tool-input" placeholder="${isWebsite ? 'e.g. 1NEymr4St_ZgL5UUW... or https://example.com' : 'e.g. 1vwAPD9R3HKCKLHB... or keyword one, keyword two'}">
       </div>
 
       <div style="display:flex; justify-content:flex-start; margin-top:2px;">
