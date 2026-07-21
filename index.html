@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="midnight">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Website & Keyword Automation Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Base CSS Variables for Theme Themes */
+  :root, [data-theme="midnight"] {
+    --bg: #090d16;
+    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                        radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.12) 0%, transparent 40%),
+                        radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 60%);
+    --surface: rgba(17, 24, 39, 0.75);
+    --surface-card: #111827;
+    --surface-hover: #1f2937;
+    --surface-border: rgba(255, 255, 255, 0.1);
+    --surface-border-glow: rgba(99, 102, 241, 0.3);
+    --input-bg: rgba(15, 23, 42, 0.8);
+    
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    
+    --accent-indigo: #6366f1;
+    --accent-indigo-hover: #4f46e5;
+    --accent-cyan: #06b6d4;
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    
+    --error: #ef4444;
+    --error-bg: rgba(239, 68, 68, 0.12);
+    --error-border: rgba(239, 68, 68, 0.3);
+    
+    --shadow-lg: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.2);
+  }
+
+  [data-theme="light"] {
+    --bg: #f1f5f9;
+    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+                        radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+    --surface: rgba(255, 255, 255, 0.85);
+    --surface-card: #ffffff;
+    --surface-hover: #f8fafc;
+    --surface-border: rgba(0, 0, 0, 0.08);
+    --surface-border-glow: rgba(99, 102, 241, 0.3);
+    --input-bg: #ffffff;
+    
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    
+    --accent-indigo: #4f46e5;
+    --accent-indigo-hover: #4338ca;
+    --accent-cyan: #0284c7;
+    --accent-emerald: #059669;
+    --accent-amber: #d97706;
+    
+    --error: #dc2626;
+    --error-bg: #fef2f2;
+    --error-border: #fca5a5;
+    
+    --shadow-lg: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
+    --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.15);
+  }
+
+  [data-theme="cyberpunk"] {
+    --bg: #0a0512;
+    --bg-gradient: radial-gradient(circle at 20% 20%, rgba(255, 0, 127, 0.2) 0%, transparent 45%),
+                        radial-gradient(circle at 80% 80%, rgba(0, 240, 255, 0.2) 0%, transparent 45%);
+    --surface: rgba(20, 10, 35, 0.85);
+    --surface-card: #130a24;
+    --surface-hover: #21113b;
+    --surface-border: rgba(255, 0, 127, 0.3);
+    --surface-border-glow: rgba(0, 240, 255, 0.5);
+    --input-bg: rgba(13, 6, 24, 0.9);
+    
+    --text-primary: #ffffff;
+    --text-secondary: #d8b4fe;
+    --text-muted: #9333ea;
+    
+    --accent-indigo: #ff007f;
+    --accent-indigo-hover: #e00070;
+    --accent-cyan: #00f0ff;
+    --accent-emerald: #10b981;
+    --accent-amber: #facc15;
+    
+    --shadow-lg: 0 20px 40px -15px rgba(255, 0, 127, 0.3);
+    --shadow-glow: 0 0 30px rgba(0, 240, 255, 0.3);
+  }
+
+  [data-theme="emerald"] {
+    --bg: #040d0c;
+    --bg-gradient: radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.2) 0%, transparent 45%),
+                        radial-gradient(circle at 80% 80%, rgba(52, 211, 153, 0.12) 0%, transparent 45%);
+    --surface: rgba(6, 24, 22, 0.8);
+    --surface-card: #09201d;
+    --surface-hover: #0f332e;
+    --surface-border: rgba(16, 185, 129, 0.2);
+    --surface-border-glow: rgba(52, 211, 153, 0.4);
+    --input-bg: rgba(4, 16, 14, 0.9);
+    
+    --text-primary: #ecfdf5;
+    --text-secondary: #a7f3d0;
+    --text-muted: #059669;
+    
+    --accent-indigo: #10b981;
+    --accent-indigo-hover: #059669;
+    --accent-cyan: #34d399;
+    --accent-emerald: #6ee7b7;
+    --accent-amber: #f59e0b;
+    
+    --shadow-lg: 0 20px 40px -15px rgba(6, 78, 59, 0.5);
+    --shadow-glow: 0 0 25px rgba(16, 185, 129, 0.25);
+  }
+
+  [data-theme="nordic"] {
+    --bg: #0f172a;
+    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.15) 0%, transparent 40%),
+                        radial-gradient(circle at 85% 85%, rgba(45, 212, 191, 0.12) 0%, transparent 40%);
+    --surface: rgba(30, 41, 59, 0.75);
+    --surface-card: #1e293b;
+    --surface-hover: #334155;
+    --surface-border: rgba(56, 189, 248, 0.2);
+    --surface-border-glow: rgba(56, 189, 248, 0.4);
+    --input-bg: rgba(15, 23, 42, 0.85);
+    
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    
+    --accent-indigo: #38bdf8;
+    --accent-indigo-hover: #0284c7;
+    --accent-cyan: #2dd4bf;
+    --accent-emerald: #34d399;
+    --accent-amber: #fbbf24;
+    
+    --shadow-lg: 0 20px 40px -15px rgba(15, 23, 42, 0.6);
+    --shadow-glow: 0 0 25px rgba(56, 189, 248, 0.25);
+  }
+
+  [data-theme="sunset"] {
+    --bg: #14091f;
+    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(244, 63, 94, 0.2) 0%, transparent 45%),
+                        radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.2) 0%, transparent 45%);
+    --surface: rgba(32, 17, 48, 0.8);
+    --surface-card: #201233;
+    --surface-hover: #311c4d;
+    --surface-border: rgba(244, 63, 94, 0.25);
+    --surface-border-glow: rgba(139, 92, 246, 0.4);
+    --input-bg: rgba(19, 8, 31, 0.9);
+    
+    --text-primary: #fff1f2;
+    --text-secondary: #f472b6;
+    --text-muted: #a21caf;
+    
+    --accent-indigo: #f43f5e;
+    --accent-indigo-hover: #e11d48;
+    --accent-cyan: #a855f7;
+    --accent-emerald: #10b981;
+    --accent-amber: #fbbf24;
+    
+    --shadow-lg: 0 20px 40px -15px rgba(76, 5, 25, 0.5);
+    --shadow-glow: 0 0 25px rgba(244, 63, 94, 0.25);
+  }
+
+  :root {
+    --radius-xl: 20px;
+    --radius-lg: 14px;
+    --radius-md: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--bg);
+    background-image: var(--bg-gradient);
+    background-attachment: fixed;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-primary);
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  /* Theme Switcher Navigation Bar */
+  .theme-switcher-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--surface-border);
+    padding: 6px 10px;
+    border-radius: 40px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .theme-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0 8px;
+  }
+
+  .theme-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border-radius: 20px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .theme-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .theme-btn.active {
+    background: var(--accent-indigo);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .page-header {
+    text-align: center;
+    max-width: 700px;
+    margin-bottom: 32px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 30px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    color: var(--accent-indigo);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-indigo);
+    box-shadow: 0 0 8px var(--accent-indigo);
+  }
+
+  .page-header h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin: 0 0 10px;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .page-header p {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* Two-column Layout Container */
+  .layout-container {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 28px;
+    width: 100%;
+    max-width: 1140px;
+    align-items: start;
+  }
+
+  /* Glass Card Styling */
+  .card {
+    background: var(--surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s ease, border-color 0.3s ease;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-indigo), var(--accent-cyan), transparent);
+    opacity: 0.8;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--surface-border);
+  }
+
+  .card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+  }
+
+  .card-title svg {
+    color: var(--accent-indigo);
+  }
+
+  /* Left Column: Main Tool Card */
+  .main-tool-card {
+    min-height: 480px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 10px;
+  }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .main-btn {
+    padding: 28px 20px;
+    font-size: 1.1rem;
+    background: var(--surface-hover);
+    border: 1px solid var(--surface-border);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .main-btn svg {
+    width: 32px;
+    height: 32px;
+    transition: transform 0.2s ease;
+  }
+
+  .main-btn:hover {
+    border-color: var(--surface-border-glow);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+  }
+
+  .main-btn:hover svg {
+    transform: scale(1.1);
+  }
+
+  .main-btn-website svg { color: var(--accent-indigo); }
+  .main-btn-keywords svg { color: var(--accent-cyan); }
+
+  /* Forms & Inputs */
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  label {
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .label-hint {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  input[type="text"], textarea {
+    padding: 14px 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    font-family: inherit;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  input[type="text"]:focus, textarea:focus {
+    border-color: var(--accent-indigo);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .primary-btn {
+    flex: 1;
+    padding: 14px 24px;
+    background: var(--accent-indigo);
+    color: white;
+    font-size: 1rem;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .primary-btn:hover {
+    background: var(--accent-indigo-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-glow);
+  }
+
+  .secondary-btn {
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid var(--surface-border);
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .secondary-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  .sheet-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 18px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--accent-emerald);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.92rem;
+    transition: all 0.2s ease;
+  }
+
+  .sheet-link:hover {
+    background: rgba(16, 185, 129, 0.22);
+    border-color: var(--accent-emerald);
+    transform: translateY(-1px);
+  }
+
+  /* Status States */
+  .loading {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .spinner {
+    width: 42px;
+    height: 42px;
+    border: 3px solid rgba(99, 102, 241, 0.15);
+    border-top-color: var(--accent-indigo);
+    border-radius: 50%;
+    animation: spin 0.8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-box {
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    color: var(--error);
+    padding: 16px;
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .pending-box {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--accent-emerald);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .result-box {
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: 18px;
+    overflow-x: auto;
+    max-height: 360px;
+  }
+
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent-emerald);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.88rem;
+  }
+
+  th, td {
+    border: 1px solid var(--surface-border);
+    padding: 10px 12px;
+    text-align: left;
+  }
+
+  th {
+    background: var(--surface-hover);
+    color: var(--accent-cyan);
+    font-weight: 600;
+  }
+
+  /* Right Column: Instructions Panel */
+  .instructions-card {
+    border-color: var(--surface-border);
+  }
+
+  .steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .step-item {
+    display: flex;
+    gap: 16px;
+    position: relative;
+  }
+
+  .step-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 18px;
+    top: 40px;
+    bottom: -16px;
+    width: 2px;
+    background: var(--surface-border);
+  }
+
+  .step-number {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid var(--surface-border-glow);
+    color: var(--accent-indigo);
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .step-content {
+    flex: 1;
+  }
+
+  .step-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 6px;
+  }
+
+  .step-desc {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  /* Improved Full URL Breakdown Box */
+  .url-guide-box {
+    margin-top: 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.8;
+    word-break: break-all;
+    white-space: normal;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+  }
+
+  .url-prefix, .url-suffix {
+    color: var(--text-muted);
+  }
+
+  .url-sheet-id {
+    display: inline-block;
+    background: rgba(245, 158, 11, 0.22);
+    border: 1px dashed var(--accent-amber);
+    color: var(--accent-amber);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    word-break: break-all;
+    margin: 2px 0;
+  }
+
+  .guide-annotation {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--accent-amber);
+    font-weight: 600;
+  }
+
+  .debug-panel {
+    display: none;
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .debug-panel h3 {
+    margin: 0 0 10px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-cyan);
+  }
+
+  /* Responsive media query */
+  @media (max-width: 900px) {
+    .layout-container {
+      grid-template-columns: 1fr;
+    }
+    
+    .page-header h1 {
+      font-size: 1.8rem;
+    }
+    
+    .card {
+      padding: 24px 20px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Theme Switcher Navigation Bar -->
+<div class="theme-switcher-bar">
+  <span class="theme-label">Theme Studio:</span>
+  <button class="theme-btn active" data-theme-id="midnight" onclick="setTheme('midnight')">🌌 Midnight</button>
+  <button class="theme-btn" data-theme-id="light" onclick="setTheme('light')">☀️ Light</button>
+  <button class="theme-btn" data-theme-id="cyberpunk" onclick="setTheme('cyberpunk')">⚡ Cyberpunk</button>
+  <button class="theme-btn" data-theme-id="emerald" onclick="setTheme('emerald')">🌲 Emerald</button>
+  <button class="theme-btn" data-theme-id="nordic" onclick="setTheme('nordic')">❄️ Nordic</button>
+  <button class="theme-btn" data-theme-id="sunset" onclick="setTheme('sunset')">🌆 Sunset</button>
+</div>
+
+<div class="page-header">
+  <div class="badge">
+    <span class="badge-dot"></span> Automation & Intelligence Hub
+  </div>
+  <h1>Website & Keyword Analysis</h1>
+  <p>Run automated web scrapes, SEO keyword research, and sync data directly to your personal Google Sheets.</p>
+</div>
+
+<div class="layout-container">
+  <!-- LEFT COLUMN: Main Automation Tool Card -->
+  <div class="card main-tool-card">
+    <div class="card-header">
+      <h2 class="card-title">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Tool Launcher
+      </h2>
+      <span id="active-mode-badge" style="font-size:0.8rem; color:var(--text-muted);">Select a tool</span>
+    </div>
+
+    <div id="app" style="flex:1; display:flex; flex-direction:column; justify-content:center;"></div>
+
+    <div id="debug-panel" class="debug-panel"></div>
+  </div>
+
+  <!-- RIGHT COLUMN: Step-by-Step Instructions & Sheet ID Navigation -->
+  <div class="card instructions-card">
+    <div class="card-header">
+      <h2 class="card-title">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Quick Start Guide
+      </h2>
+    </div>
+
+    <div class="steps-list">
+      <!-- Step 1 -->
+      <div class="step-item">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3 class="step-title">Make a Copy of the Google Sheet</h3>
+          <p class="step-desc">Choose your desired tool on the left and click the <strong>Copy Template Google Sheet</strong> button. This opens the template in Google Sheets so you can make your own editable copy.</p>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step-item">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3 class="step-title">Locate & Copy your Sheet ID</h3>
+          <p class="step-desc">Look at your browser's address bar when viewing your copied Google Sheet. Copy the entire ID string between <code>/d/</code> and <code>/edit</code>:</p>
+          
+          <div class="url-guide-box">
+            <span class="url-prefix">https://docs.google.com/spreadsheets/d/</span>
+            <span class="url-sheet-id">1NEymr4St_ZgL5UUW_h4TGO8xbcy20Bu7V9edCuuIWkU</span>
+            <span class="url-suffix">/edit#gid=0</span>
+          </div>
+          
+          <div class="guide-annotation">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            The highlighted text in yellow above is the complete Sheet ID
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step-item">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3 class="step-title">Paste Sheet ID or URL & Inputs</h3>
+          <p class="step-desc">Paste the copied <strong>Sheet ID</strong> (or full URL) into the input box on the left, along with your target Website URL or comma-separated Keywords.</p>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step-item">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <h3 class="step-title">Submit & Track Results</h3>
+          <p class="step-desc">Hit <strong>Submit Request</strong>. The workflow triggers in the background and populates your Google Sheet with structured findings in under a minute.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setTheme(themeName) {
+  document.documentElement.setAttribute('data-theme', themeName);
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    if (btn.dataset.themeId === themeName) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+const WEBHOOKS = {
+  website: "https://n8n.srv1799142.hstgr.cloud/webhook/a75792c3-2e98-446f-9cc7-8f10e294f28c",
+  keywords: "https://n8n.srv1799142.hstgr.cloud/webhook/a50bc329-6f29-4833-9d72-306d7bacbb17"
+};
+const SHEETS = {
+  website: "https://docs.google.com/spreadsheets/d/1NEymr4St_ZgL5UUW_h4TGO8xbcy20Bu7V9edCuuIWkU/copy",
+  keywords: "https://docs.google.com/spreadsheets/d/1vwAPD9R3HKCKLHBhT76vLi_pTt9SMblpYxa2H56Jaqc/copy"
+};
+const SHEET_IDS = {
+  website: "1NEymr4St_ZgL5UUW_h4TGO8xbcy20Bu7V9edCuuIWkU",
+  keywords: "1vwAPD9R3HKCKLHBhT76vLi_pTt9SMblpYxa2H56Jaqc"
+};
+
+const app = document.getElementById("app");
+const modeBadge = document.getElementById("active-mode-badge");
+
+function renderHome() {
+  if (modeBadge) modeBadge.textContent = "Home";
+  app.innerHTML = `
+    <div class="btn-row">
+      <button class="main-btn main-btn-website" id="btn-website">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+        <span>Website Tool</span>
+      </button>
+      <button class="main-btn main-btn-keywords" id="btn-keywords">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
+        <span>Keyword Tool</span>
+      </button>
+    </div>
+  `;
+  document.getElementById("btn-website").onclick = () => renderConfirm("website");
+  document.getElementById("btn-keywords").onclick = () => renderConfirm("keywords");
+}
+
+function renderConfirm(type) {
+  const isWebsite = type === "website";
+  if (modeBadge) modeBadge.textContent = isWebsite ? "Website Analysis" : "Keyword Research";
+  
+  app.innerHTML = `
+    <form onsubmit="return false;">
+      <div class="form-group">
+        <label for="tool-input">
+          ${isWebsite ? "Sheet ID or Website URL" : "Keywords List"}
+          <span class="label-hint">${isWebsite ? "Paste Google Sheet ID / URL" : "Comma separated"}</span>
+        </label>
+        ${isWebsite
+          ? `<input type="text" id="tool-input" placeholder="e.g. 1NEymr4St_ZgL5UUW... or https://example.com">`
+          : `<textarea id="tool-input" rows="3" placeholder="keyword one, keyword two, keyword three"></textarea>`}
+      </div>
+
+      <div style="display:flex; justify-content:flex-start; margin-top:2px;">
+        <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          Copy Template Google Sheet
+        </a>
+      </div>
+
+      <div class="form-actions" style="margin-top: 14px;">
+        <button type="button" class="primary-btn" id="submit-btn">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          Submit Request
+        </button>
+        <button type="button" class="secondary-btn" id="back-btn">Back</button>
+      </div>
+    </form>
+  `;
+  document.getElementById("back-btn").onclick = renderHome;
+  document.getElementById("submit-btn").onclick = () => submitRequest(type);
+}
+
+function renderLoading() {
+  app.innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <div>
+        <strong style="display:block; color:var(--text-primary); margin-bottom:4px;">Processing Request...</strong>
+        Connecting to n8n webhook and running tasks
+      </div>
+    </div>
+  `;
+}
+
+function renderError(type, message) {
+  app.innerHTML = `
+    <div class="error-box">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <div>${escapeHtml(message)}</div>
+    </div>
+    <div class="footer-actions form-actions" style="margin-top: 20px;">
+      <button class="secondary-btn" id="retry-btn">Try Again / Back</button>
+    </div>
+  `;
+  document.getElementById("retry-btn").onclick = () => renderConfirm(type);
+}
+
+function renderPending(type) {
+  app.innerHTML = `
+    <div class="pending-box">
+      <strong>✨ Request Submitted Successfully!</strong><br/>
+      Your task is being processed. The results will automatically populate your Google Sheet shortly (usually within 30-60 seconds).
+    </div>
+    <div style="margin-top:16px;">
+      <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        Open Google Sheet
+      </a>
+    </div>
+    <div class="footer-actions form-actions" style="margin-top:20px;">
+      <button class="secondary-btn" id="reset-btn">Back to Start</button>
+    </div>
+  `;
+  document.getElementById("reset-btn").onclick = renderHome;
+}
+
+function renderResult(type, data) {
+  const isKeywords = type === "keywords";
+  const body = isKeywords ? renderAsTable(data) : `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+  app.innerHTML = `
+    <div class="result-box">${body}</div>
+    <div style="margin-top:16px;">
+      <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">Open Google Sheet</a>
+    </div>
+    <div class="footer-actions form-actions" style="margin-top:20px;">
+      <button class="secondary-btn" id="reset-btn">Back to Start</button>
+    </div>
+  `;
+  document.getElementById("reset-btn").onclick = renderHome;
+}
+
+function renderAsTable(data) {
+  const rows = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : null);
+  if (!rows || rows.length === 0 || typeof rows[0] !== "object") {
+    return `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+  }
+  const columns = [...new Set(rows.flatMap(r => Object.keys(r)))];
+  const head = columns.map(c => `<th>${escapeHtml(c)}</th>`).join("");
+  const body = rows.map(r =>
+    `<tr>${columns.map(c => `<td>${escapeHtml(r[c] ?? "")}</td>`).join("")}</tr>`
+  ).join("");
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function isDebugMode() {
+  return new URLSearchParams(window.location.search).get("debug") === "1";
+}
+
+function renderDebugPanel(type, payload, response) {
+  const panel = document.getElementById("debug-panel");
+  if (!isDebugMode()) {
+    panel.style.display = "none";
+    return;
+  }
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <h3>Debug Info &mdash; ${escapeHtml(type)}</h3>
+    <div><strong>Payload sent:</strong></div>
+    <pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
+    ${response ? `<div style="margin-top:8px;"><strong>Response:</strong></div><pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>` : ""}
+  `;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function parseSheetId(val) {
+  if (!val) return null;
+  const match = val.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) return match[1];
+  if (!val.includes("/") && !val.includes("http") && val.length > 15) return val;
+  return null;
+}
+
+async function submitRequest(type) {
+  const inputEl = document.getElementById("tool-input");
+  const typedValue = inputEl ? inputEl.value.trim() : "";
+
+  renderLoading();
+  const payload = { sheetId: SHEET_IDS[type] };
+
+  if (typedValue) {
+    const customSheetId = parseSheetId(typedValue);
+    if (customSheetId) {
+      payload.sheetId = customSheetId;
+    } else if (type === "website") {
+      payload.url = typedValue;
+    } else {
+      payload.keywords = typedValue.split(",").map(k => k.trim()).filter(Boolean);
+    }
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  console.log(`[${type}] request:`, {
+    url: WEBHOOKS[type],
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: payload
+  });
+  renderDebugPanel(type, payload, null);
+
+  try {
+    const res = await fetch(WEBHOOKS[type], {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    const rawText = await res.text();
+    const headers = {};
+    res.headers.forEach((v, k) => { headers[k] = v; });
+    const responseInfo = { status: res.status, statusText: res.statusText, headers, body: rawText };
+    console.log(`[${type}] full response:`, responseInfo);
+    renderDebugPanel(type, payload, responseInfo);
+
+    if (!res.ok) {
+      throw new Error(`Request failed (status ${res.status})`);
+    }
+
+    if (!rawText.trim()) {
+      renderPending(type);
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      data = rawText;
+    }
+
+    renderResult(type, data);
+  } catch (err) {
+    clearTimeout(timeout);
+    const message = err.name === "AbortError"
+      ? "The request timed out. Please try again."
+      : `Something went wrong: ${err.message}`;
+    renderError(type, message);
+  }
+}
+
+renderHome();
+</script>
+</body>
+</html>
