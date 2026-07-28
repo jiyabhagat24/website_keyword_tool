@@ -714,6 +714,158 @@
     color: var(--accent-cyan);
   }
 
+  /* Toggle switch */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+  }
+
+  .toggle-row .toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .toggle-row .toggle-title {
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--text-primary);
+  }
+
+  .toggle-row .toggle-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .switch input { opacity: 0; width: 0; height: 0; }
+
+  .switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--surface-hover);
+    border: 1px solid var(--surface-border);
+    transition: 0.2s;
+    border-radius: 24px;
+  }
+
+  .switch-slider::before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--text-secondary);
+    transition: 0.2s;
+    border-radius: 50%;
+  }
+
+  .switch input:checked + .switch-slider {
+    background-color: var(--accent-indigo);
+    border-color: var(--accent-indigo);
+  }
+
+  .switch input:checked + .switch-slider::before {
+    transform: translateX(20px);
+    background-color: #ffffff;
+  }
+
+  /* Location checkbox grid */
+  .location-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 6px 10px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+  }
+
+  .location-grid label {
+    font-weight: 400;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-start;
+    cursor: pointer;
+  }
+
+  .location-grid input[type="checkbox"] {
+    accent-color: var(--accent-indigo);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+
+  .location-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .location-actions button {
+    background: none;
+    border: none;
+    color: var(--accent-cyan);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .location-actions button:hover { text-decoration: underline; }
+
+  .daterange-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .daterange-grid .field-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+
+  select {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-family: inherit;
+    color: var(--text-primary);
+    outline: none;
+  }
+
+  select:focus {
+    border-color: var(--accent-indigo);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  }
+
   /* Responsive media query */
   @media (max-width: 900px) {
     .layout-container {
@@ -852,6 +1004,76 @@ const SHEET_IDS = {
   keywords: "1vwAPD9R3HKCKLHBhT76vLi_pTt9SMblpYxa2H56Jaqc"
 };
 
+// Must match the tabName list in the "Code in JavaScript" node of both n8n workflows
+const LOCATIONS = [
+  "India", "Maharashtra", "Delhi", "Uttar Pradesh", "Karnataka", "Tamil Nadu",
+  "Gujarat", "West Bengal", "Rajasthan", "Andhra Pradesh", "Telangana", "Kerala",
+  "Punjab", "Haryana", "Madhya Pradesh", "Bihar", "Odisha", "Assam", "Jharkhand",
+  "Uttarakhand", "Himachal Pradesh", "Goa", "Manipur", "Meghalaya", "Mizoram",
+  "Nagaland", "Sikkim", "Tripura", "Arunachal Pradesh", "Chandigarh", "Puducherry",
+  "Dadra & Nagar Havelli", "Bengaluru", "Delhi NCR", "CMR", "Hyderabad", "MMR",
+  "PMR", "KMR", "AMR", "Jaipur", "Lucknow", "Coimbatore", "Indore", "Kochi",
+  "Ernakulam", "Thiruvananthapuram", "Nagpur"
+];
+
+const MONTHS = [
+  "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+  "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
+];
+
+function setupLocationGrid() {
+  const toggle = document.getElementById("all-locations-toggle");
+  const wrap = document.getElementById("location-grid-wrap");
+  const grid = document.getElementById("location-grid");
+
+  grid.innerHTML = LOCATIONS.map((loc, i) => `
+    <label>
+      <input type="checkbox" class="loc-checkbox" value="${escapeHtml(loc)}" id="loc-${i}">
+      ${escapeHtml(loc)}
+    </label>
+  `).join("");
+
+  toggle.onchange = () => {
+    wrap.style.display = toggle.checked ? "none" : "block";
+  };
+
+  document.getElementById("loc-select-all").onclick = () => {
+    grid.querySelectorAll(".loc-checkbox").forEach(cb => cb.checked = true);
+  };
+  document.getElementById("loc-select-none").onclick = () => {
+    grid.querySelectorAll(".loc-checkbox").forEach(cb => cb.checked = false);
+  };
+}
+
+function setupDateRangeFields() {
+  const toggle = document.getElementById("custom-daterange-toggle");
+  const wrap = document.getElementById("daterange-fields");
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
+
+  const monthOptions = MONTHS.map(m => `<option value="${m}">${m[0]}${m.slice(1).toLowerCase()}</option>`).join("");
+  const yearOptions = years.map(y => `<option value="${y}">${y}</option>`).join("");
+
+  ["start-month", "end-month"].forEach(id => {
+    document.getElementById(id).innerHTML = monthOptions;
+  });
+  ["start-year", "end-year"].forEach(id => {
+    document.getElementById(id).innerHTML = yearOptions;
+  });
+
+  // Default to trailing 12 months, same logic as the n8n Config node
+  const startRef = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  document.getElementById("start-month").value = MONTHS[startRef.getMonth()];
+  document.getElementById("start-year").value = String(startRef.getFullYear());
+  document.getElementById("end-month").value = MONTHS[now.getMonth()];
+  document.getElementById("end-year").value = String(now.getFullYear());
+
+  toggle.onchange = () => {
+    wrap.style.display = toggle.checked ? "block" : "none";
+  };
+}
+
 const app = document.getElementById("app");
 const modeBadge = document.getElementById("active-mode-badge");
 
@@ -894,6 +1116,59 @@ function renderConfirm(type) {
         </a>
       </div>
 
+      <div class="form-group">
+        <div class="toggle-row">
+          <div class="toggle-text">
+            <span class="toggle-title">All Locations</span>
+            <span class="toggle-hint">India + all 48 states/cities. Turn off to pick specific ones.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="all-locations-toggle" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <div id="location-grid-wrap" style="display:none; margin-top:10px;">
+          <div class="location-actions">
+            <button type="button" id="loc-select-all">Select all</button>
+            <button type="button" id="loc-select-none">Clear</button>
+          </div>
+          <div class="location-grid" id="location-grid"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="toggle-row">
+          <div class="toggle-text">
+            <span class="toggle-title">Custom Date Range</span>
+            <span class="toggle-hint">Default: trailing 12 months from today.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="custom-daterange-toggle">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <div id="daterange-fields" style="display:none; margin-top:10px;">
+          <div class="daterange-grid">
+            <div>
+              <div class="field-label">Start Month</div>
+              <select id="start-month"></select>
+            </div>
+            <div>
+              <div class="field-label">Start Year</div>
+              <select id="start-year"></select>
+            </div>
+            <div>
+              <div class="field-label">End Month</div>
+              <select id="end-month"></select>
+            </div>
+            <div>
+              <div class="field-label">End Year</div>
+              <select id="end-year"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="form-actions" style="margin-top: 14px;">
         <button type="button" class="primary-btn" id="submit-btn">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
@@ -905,6 +1180,8 @@ function renderConfirm(type) {
   `;
   document.getElementById("back-btn").onclick = renderHome;
   document.getElementById("submit-btn").onclick = () => submitRequest(type);
+  setupLocationGrid();
+  setupDateRangeFields();
 }
 
 function renderLoading() {
@@ -1018,17 +1295,40 @@ async function submitRequest(type) {
   const typedValue = inputEl ? inputEl.value.trim() : "";
 
   renderLoading();
-  const payload = { sheetId: SHEET_IDS[type] };
+
+  // sheetUrl accepts either a full Google Sheets URL or a raw sheet ID -
+  // the n8n Config node extracts the ID either way, so send whatever the
+  // user typed and fall back to the default template sheet.
+  const payload = { sheetUrl: SHEET_IDS[type] };
 
   if (typedValue) {
     const customSheetId = parseSheetId(typedValue);
     if (customSheetId) {
-      payload.sheetId = customSheetId;
+      payload.sheetUrl = customSheetId;
     } else if (type === "website") {
       payload.url = typedValue;
     } else {
       payload.keywords = typedValue.split(",").map(k => k.trim()).filter(Boolean);
     }
+  }
+
+  // Location toggle
+  const allLocationsToggle = document.getElementById("all-locations-toggle");
+  const allLocations = allLocationsToggle ? allLocationsToggle.checked : true;
+  payload.allLocations = allLocations;
+  if (!allLocations) {
+    const selected = Array.from(document.querySelectorAll(".loc-checkbox:checked")).map(cb => cb.value);
+    payload.locations = selected;
+  }
+
+  // Date range toggle - only send explicit fields when the user opted into a custom range,
+  // otherwise the n8n Config node defaults to trailing 12 months.
+  const customRangeToggle = document.getElementById("custom-daterange-toggle");
+  if (customRangeToggle && customRangeToggle.checked) {
+    payload.startMonth = document.getElementById("start-month").value;
+    payload.startYear = Number(document.getElementById("start-year").value);
+    payload.endMonth = document.getElementById("end-month").value;
+    payload.endYear = Number(document.getElementById("end-year").value);
   }
 
   const controller = new AbortController();
