@@ -1,0 +1,350 @@
+{
+  "name": "Keyword Pipeline  — Dynamic Sheet + Smart Skip",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\n\n// Accept either a full Google Sheets URL or a raw sheet ID\nfunction extractSheetId(input) {\n  if (!input) return '';\n  const match = String(input).match(/\\/d\\/([a-zA-Z0-9-_]+)/);\n  return match ? match[1] : String(input).trim();\n}\n\nconst sheetId = extractSheetId(body.sheetUrl || body.sheetId);\nif (!sheetId) {\n  throw new Error('No sheetUrl or sheetId provided in the webhook body, or the sheet URL could not be parsed.');\n}\n\n// Historical metrics date range — defaults to trailing 12 months if not supplied\nconst MONTHS = [\"JANUARY\",\"FEBRUARY\",\"MARCH\",\"APRIL\",\"MAY\",\"JUNE\",\"JULY\",\"AUGUST\",\"SEPTEMBER\",\"OCTOBER\",\"NOVEMBER\",\"DECEMBER\"];\nconst now = new Date();\nconst endYear = body.endYear || now.getFullYear();\nconst endMonth = body.endMonth || MONTHS[now.getMonth()];\nconst startRef = new Date(now.getFullYear(), now.getMonth() - 11, 1);\nconst startYear = body.startYear || startRef.getFullYear();\nconst startMonth = body.startMonth || MONTHS[startRef.getMonth()];\n\n// Location targeting — allLocations (default true) pulls every configured\n// region; set it false and pass locations: [\"Maharashtra\", \"Bengaluru\", ...]\n// (tabName values from the Code in JavaScript node) to run a subset only.\nconst allLocations = body.allLocations !== undefined ? !!body.allLocations : true;\nconst locations = Array.isArray(body.locations) ? body.locations : [];\n\nreturn [{\n  json: {\n    sheetId,\n    allLocations,\n    locations,\n    startYear,\n    startMonth,\n    endYear,\n    endMonth\n  }\n}];"
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 416],
+      "id": "7733ff83-936e-4960-ba54-147697709823",
+      "notes": "Webhook body now expects: sheetUrl (or sheetId), allLocations (bool, default true), locations (string[] of tabNames, used only when allLocations=false), startYear/startMonth/endYear/endMonth (default trailing 12 months)."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "={{ $('Config').item.json.sheetId }}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": 2060186520, "mode": "list", "cachedResultName": "Keyword Suggestion", "cachedResultUrl": "https://docs.google.com/spreadsheets/d/18zxRhnd8wDSjesfVzR5aBh5Bh1VdjaFRV7v080D6TkQ/edit#gid=2060186520" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "search volume": "={{ $json.keywordIdeaMetrics.avgMonthlySearches }}",
+            "Keyword": "={{ $json.text }}",
+            "low bid": "={{ $json.keywordIdeaMetrics.lowTopOfPageBidMicros }}",
+            "high bid": "={{ $json.keywordIdeaMetrics.highTopOfPageBidMicros }}",
+            "competition Index": "={{ $json.keywordIdeaMetrics.competitionIndex }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Keyword", "displayName": "Keyword", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "search volume", "displayName": "search volume", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "competition Index", "displayName": "competition Index", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "high bid", "displayName": "high bid", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "low bid", "displayName": "low bid", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2720, 240],
+      "id": "02a2eccb-aa93-43e8-9ad6-9a90e7ec0d3c",
+      "name": "Append row in sheet",
+      "credentials": { "googleSheetsOAuth2Api": { "id": "HbTBFOQL9BwZRqoB", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "={{ $('Config').item.json.sheetId }}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Keyword input", "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1qBgIXtqiHJQt56RxPbw7bEVu8e7eFNOl0MOxRUr1PUM/edit#gid=0" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": { "Keyword": "={{ $json.text }}" },
+          "matchingColumns": ["Keyword"],
+          "schema": [ { "id": "Keyword", "displayName": "Keyword", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false } ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2720, 512],
+      "id": "55e1eb80-030f-4bba-af09-a5a0d586dabd",
+      "name": "Append or update row in sheet1",
+      "credentials": { "googleSheetsOAuth2Api": { "id": "HbTBFOQL9BwZRqoB", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://googleads.googleapis.com/v21/customers/3338426742:generateKeywordIdeas",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleAdsOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "developer-token", "value": "hoTH9Xi3q3zzd4OxTcoU9A" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n\n  keywordSeed: { keywords: [$json.Keyword.trim().toLowerCase()] },\n\n  geoTargetConstants: ['geoTargetConstants/2356'],\n\n  language: 'languageConstants/1000',\n\n  keywordPlanNetwork: 'GOOGLE_SEARCH',\n\n  pageSize: 100\n\n}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2048, 416],
+      "id": "9e451bd5-109c-4691-811b-564a2008f91e",
+      "name": "Google Ads: Keyword Ideas",
+      "credentials": { "googleAdsOAuth2Api": { "id": "WsUYFMQNsMgV21DH", "name": "Google Ads account" } },
+      "continueOnFail": true,
+      "notes": "Replaces DataForSEO 'get-keyword-ideas'. Returns up to 1000 related keyword suggestions."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            { "id": "error-check", "leftValue": "={{ $json.error !== undefined || $json.code !== undefined }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } },
+            { "id": "c527a458-daa0-494d-969e-57a1981e5fd5", "leftValue": "=={{ !!$json.error }}", "rightValue": "true", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } },
+            { "id": "26ac5119-b229-4ecf-82a9-2c126b905e1f", "leftValue": "=={{ $json.results === undefined }}", "rightValue": "true", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "name": "Error? Skip Location",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4288, 176],
+      "id": "dc8e9d63-d9bc-464f-a139-17d49b87961f"
+    },
+    { "parameters": { "amount": 3 }, "name": "Wait 3s", "type": "n8n-nodes-base.wait", "typeVersion": 1.1, "position": [4512, 176], "id": "979fb5cf-4208-4044-a286-1429c7a4066e", "webhookId": "db8d74dc-0a3d-44fc-bdd5-074eb2221015" },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            { "id": "skip-condition", "leftValue": "={{ $json.error ? true : (($json.values?.length ?? 1) - 1) >= $('Aggregate').item.json.data.length }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equal" } },
+            { "id": "80b02085-c1c9-40d4-b596-9b8eb843ceab", "leftValue": "=={{ !!$json.error }}", "rightValue": "true ", "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" } },
+            { "id": "a05bfa30-1ba2-4107-b736-13ebe78f3a36", "leftValue": "={{ ($json.values?.length ?? 0) }}", "rightValue": 1, "operator": { "type": "number", "operation": "gt" } }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "name": "Skip If Done",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3840, 176],
+      "id": "bb1faf81-5d94-4710-980c-121f6b2cb231"
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').item.json.sheetId }}/values/{{ encodeURIComponent($('Loop over states').item.json.tabName) }}!A:A",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "name": "Get Row Count",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3616, 176],
+      "id": "e6032468-6d62-48d6-827a-4de8a035c670",
+      "credentials": { "googleSheetsOAuth2Api": { "id": "HbTBFOQL9BwZRqoB", "name": "Google Sheets account" } },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://googleads.googleapis.com/v21/customers/3338426742:generateKeywordHistoricalMetrics",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleAdsOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "developer-token", "value": "hoTH9Xi3q3zzd4OxTcoU9A" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"keywords\": {{ JSON.stringify($('Get row(s) in sheet').all().filter(row => row.json.Keyword).map(row => String(row.json.Keyword).trim().toLowerCase())) }},\n  \"geoTargetConstants\": [\n    \"geoTargetConstants/{{ $('Loop over states').item.json.geoId }}\"\n  ],\n  \"language\": \"languageConstants/1000\",\n  \"keywordPlanNetwork\": \"GOOGLE_SEARCH\",\n\"historicalMetricsOptions\": {\n    \"yearMonthRange\": {\n      \"start\": { \"year\": {{ $('Config').item.json.startYear }}, \"month\": \"{{ $('Config').item.json.startMonth }}\" },\n      \"end\": { \"year\": {{ $('Config').item.json.endYear }}, \"month\": \"{{ $('Config').item.json.endMonth }}\" }\n    }\n  }\n\n}",
+        "options": { "redirect": { "redirect": {} } }
+      },
+      "name": "Google Ads API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [4064, 176],
+      "id": "dcedc69b-f4e1-49eb-af74-dcff8824e446",
+      "alwaysOutputData": true,
+      "credentials": { "googleAdsOAuth2Api": { "id": "WsUYFMQNsMgV21DH", "name": "Google Ads account" } },
+      "continueOnFail": true,
+      "notes": "Requires: Google OAuth2 credential with scope https://www.googleapis.com/auth/adwords. Date range now comes from Config (webhook startYear/startMonth/endYear/endMonth), defaulting to trailing 12 months."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "vol-gt-0-historical",
+              "leftValue": "={{ Number($json.keywordMetrics?.avgMonthlySearches ?? 0) }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Filter Zero Volume (Historical)",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [4848, 176],
+      "id": "b2c3d4e5-0003-4a11-9c11-000000000003",
+      "notes": "Drops keywords with avgMonthlySearches of 0 or missing before they hit the state sheet tabs."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "={{ $('Config').item.json.sheetId }}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "={{ $('Loop over states').item.json.tabName }}", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Keyword": "={{ $json.text }}",
+            "month1": "={{ $json.keywordMetrics.monthlySearchVolumes[0].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[0].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[0].monthlySearches }}",
+            "search volume": "={{ $json.keywordMetrics.avgMonthlySearches }}",
+            "month2": "={{ $json.keywordMetrics.monthlySearchVolumes[1].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[1].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[1].monthlySearches }}",
+            "month 3": "={{ $json.keywordMetrics.monthlySearchVolumes[2].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[2].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[2].monthlySearches }}",
+            "month4": "={{ $json.keywordMetrics.monthlySearchVolumes[3].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[3].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[3].monthlySearches }}",
+            "month5": "={{ $json.keywordMetrics.monthlySearchVolumes[4].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[4].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[4].monthlySearches }}",
+            "month 6": "={{ $json.keywordMetrics.monthlySearchVolumes[5].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[5].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[5].monthlySearches }}",
+            "month 7": "={{ $json.keywordMetrics.monthlySearchVolumes[6].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[6].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[6].monthlySearches }}",
+            "month8": "={{ $json.keywordMetrics.monthlySearchVolumes[7].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[7].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[7].monthlySearches }}",
+            "month 9": "={{ $json.keywordMetrics.monthlySearchVolumes[8].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[8].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[8].monthlySearches }}",
+            "month10": "={{ $json.keywordMetrics.monthlySearchVolumes[9].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[9].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[9].monthlySearches }}",
+            "month11": "={{ $json.keywordMetrics.monthlySearchVolumes[10].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[10].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[10].monthlySearches }}",
+            "month12": "={{ $json.keywordMetrics.monthlySearchVolumes[11].month }}-{{ $json.keywordMetrics.monthlySearchVolumes[11].year }}-{{ $json.keywordMetrics.monthlySearchVolumes[11].monthlySearches }}",
+            "competition index": "={{ $json.keywordMetrics.competitionIndex }}",
+            "low big": "={{ $json.keywordMetrics.lowTopOfPageBidMicros }}",
+            "high bid": "={{ $json.keywordMetrics.highTopOfPageBidMicros }}",
+            "competition": "={{ $json.keywordMetrics.competition }}"
+          },
+          "matchingColumns": ["Keyword"],
+          "schema": [
+            { "id": "Keyword", "displayName": "Keyword", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "search volume", "displayName": "search volume", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month1", "displayName": "month1", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month2", "displayName": "month2", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month 3", "displayName": "month 3", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month4", "displayName": "month4", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month5", "displayName": "month5", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month 6", "displayName": "month 6", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month 7", "displayName": "month 7", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month8", "displayName": "month8", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month 9", "displayName": "month 9", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month10", "displayName": "month10", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month11", "displayName": "month11", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "month12", "displayName": "month12", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "competition", "displayName": "competition", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "competition index", "displayName": "competition index", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "high bid", "displayName": "high bid", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "low big", "displayName": "low big", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [5072, 448],
+      "id": "16725b7b-3c27-401c-b70a-7ce000958d06",
+      "name": "Append or update row in sheet",
+      "credentials": { "googleSheetsOAuth2Api": { "id": "HbTBFOQL9BwZRqoB", "name": "Google Sheets account" } },
+      "continueOnFail": true
+    },
+    { "parameters": { "fieldToSplitOut": "results", "options": {} }, "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [4736, 176], "id": "8e1e7835-9bbe-4605-80c9-95e44fe0dee9", "name": "Split Out" },
+    { "parameters": { "options": {} }, "type": "n8n-nodes-base.splitInBatches", "typeVersion": 3, "position": [3392, 512], "id": "413b9791-49f2-43f8-b3ae-2d724c645e86", "name": "Loop over states" },
+    {
+      "parameters": {
+        "jsCode": "const allLocationsData = [\n  { tabName: \"India\", geoId: \"2356\" },\n  { tabName: \"Maharashtra\", geoId: \"20462\" },\n  { tabName: \"Delhi\", geoId: \"20456\" },\n  { tabName: \"Uttar Pradesh\", geoId: \"20471\" },\n  { tabName: \"Karnataka\", geoId: \"20460\" },\n  { tabName: \"Tamil Nadu\", geoId: \"20469\" },\n  { tabName: \"Gujarat\", geoId: \"20457\" },\n  { tabName: \"West Bengal\", geoId: \"20472\" },\n  { tabName: \"Rajasthan\", geoId: \"20468\" },\n  { tabName: \"Andhra Pradesh\", geoId: \"20453\" },\n  { tabName: \"Telangana\", geoId: \"9061642\" },\n  { tabName: \"Kerala\", geoId: \"20461\" },\n  { tabName: \"Punjab\", geoId: \"20466\" },\n  { tabName: \"Haryana\", geoId: \"20458\" },\n  { tabName: \"Madhya Pradesh\", geoId: \"20464\" },\n  { tabName: \"Bihar\", geoId: \"20455\" },\n  { tabName: \"Odisha\", geoId: \"20465\" },\n  { tabName: \"Assam\", geoId: \"20454\" },\n  { tabName: \"Jharkhand\", geoId: \"21336\" },\n  { tabName: \"Uttarakhand\", geoId: \"21341\" },\n  { tabName: \"Himachal Pradesh\", geoId: \"21335\" },\n  { tabName: \"Goa\", geoId: \"21268\" },\n  { tabName: \"Manipur\", geoId: \"21337\" },\n  { tabName: \"Meghalaya\", geoId: \"20463\" },\n  { tabName: \"Mizoram\", geoId: \"21338\" },\n  { tabName: \"Nagaland\", geoId: \"21339\" },\n  { tabName: \"Sikkim\", geoId: \"21340\" },\n  { tabName: \"Tripura\", geoId: \"20470\" },\n  { tabName: \"Arunachal Pradesh\", geoId: \"21289\" },\n  { tabName: \"Chandigarh\", geoId: \"21342\" },\n  { tabName: \"Puducherry\", geoId: \"20467\" },\n  { tabName: \"Dadra & Nagar Havelli\", geoId: \"21343\" },\n  { tabName: \"Bengaluru\", geoId: \"1007768\" },\n  { tabName: \"Delhi NCR\", geoId: \"20456\" },\n  { tabName: \"CMR\", geoId: \"1007809\" }, // Mapped to Chennai\n  { tabName: \"Hyderabad\", geoId: \"1007740\" },\n  { tabName: \"MMR\", geoId: \"1007785\" }, // Mapped to Mumbai\n  { tabName: \"PMR\", geoId: \"1007788\" }, // Mapped to Pune\n  { tabName: \"KMR\", geoId: \"1007828\" }, // Mapped to Kolkata\n  { tabName: \"AMR\", geoId: \"1007753\" }, // Mapped to Ahmedabad\n  { tabName: \"Jaipur\", geoId: \"1007805\" },\n  { tabName: \"Lucknow\", geoId: \"1007824\" },\n  { tabName: \"Coimbatore\", geoId: \"1007810\" },\n  { tabName: \"Indore\", geoId: \"1007796\" },\n  { tabName: \"Kochi\", geoId: \"1007776\" },\n  { tabName: \"Ernakulam\", geoId: \"9040212\" },\n  { tabName: \"Thiruvananthapuram\", geoId: \"1007779\" },\n  { tabName: \"Nagpur\", geoId: \"1007786\" }\n];\n\nconst cfg = $('Config').item.json;\nconst filtered = cfg.allLocations\n  ? allLocationsData\n  : allLocationsData.filter(loc => cfg.locations.includes(loc.tabName));\n\nif (filtered.length === 0) {\n  throw new Error('allLocations is false but none of the requested locations matched a known tabName.');\n}\n\nreturn filtered.map(loc => ({ json: loc }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3168, 512],
+      "id": "8fc3021b-57c1-4cc5-b622-c326c6bc8f0a",
+      "name": "Code in JavaScript"
+    },
+    { "parameters": { "aggregate": "aggregateAllItemData", "include": "specifiedFields", "fieldsToInclude": "Keyword", "options": {} }, "type": "n8n-nodes-base.aggregate", "typeVersion": 1, "position": [2944, 512], "id": "d617f17f-c7cf-4878-8ccf-8a0f5a2267ca", "name": "Aggregate" },
+    {
+      "parameters": {
+        "documentId": { "__rl": true, "value": "={{ $('Config').item.json.sheetId }}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Keyword input", "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1jNnh1Pu7YXp5DOVhHlxeOxvKZkFx9oOIWPScN16f5ns/edit#gid=0" },
+        "options": {}
+      },
+      "name": "Read Keywords from Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1824, 416],
+      "id": "c3462e57-790f-4b9e-8ce1-0389622b80bf",
+      "credentials": { "googleSheetsOAuth2Api": { "id": "HbTBFOQL9BwZRqoB", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "documentId": { "__rl": true, "value": "={{ $('Config').item.json.sheetId }}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Keyword Input", "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zAm2UzVyyKYoE9jhEw2Mx9ncAimTI1BkSUh3hTBqbJs/edit#gid=0" },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2720, 512],
+      "id": "2e55290f-f15b-421c-80b3-28455b3fb8b6",
+      "name": "Get row(s) in sheet",
+      "executeOnce": true,
+      "credentials": { "googleSheetsOAuth2Api": { "id": "HbTBFOQL9BwZRqoB", "name": "Google Sheets account" } }
+    },
+    { "parameters": { "fieldToSplitOut": "results", "options": {} }, "type": "n8n-nodes-base.splitOut", "typeVersion": 1, "position": [2272, 416], "id": "da294a7d-ddc9-4a4d-96c8-83bb35f2e577", "name": "Split Out1" },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "vol-gt-0-ideas",
+              "leftValue": "={{ Number($json.keywordIdeaMetrics?.avgMonthlySearches ?? 0) }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Filter Zero Volume (Ideas)",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [2496, 416],
+      "id": "c3d4e5f6-0004-4a11-9c11-000000000004",
+      "notes": "Drops keyword ideas with avgMonthlySearches of 0 or missing before they reach the Keyword Suggestion / Keyword Input sheets."
+    },
+    { "parameters": { "httpMethod": "POST", "path": "a50bc329-6f29-4833-9d72-306d7bacbb17", "responseMode": "responseNode", "options": {} }, "type": "n8n-nodes-base.webhook", "typeVersion": 2.1, "position": [1376, 416], "id": "8d2590cf-aec1-4f76-a955-303915316ee1", "name": "Webhook", "webhookId": "a50bc329-6f29-4833-9d72-306d7bacbb17" },
+    { "parameters": { "respondWith": "json", "responseBody": "={\"status\": \"success\"}", "options": {} }, "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1.5, "position": [3616, 368], "id": "b24372c4-ffa3-4fe9-b170-218b6e4264ad", "name": "Respond to Webhook" }
+  ],
+  "pinData": {},
+  "connections": {
+    "Config": { "main": [[ { "node": "Read Keywords from Sheet", "type": "main", "index": 0 } ]] },
+    "Append or update row in sheet1": { "main": [[ { "node": "Get row(s) in sheet", "type": "main", "index": 0 } ]] },
+    "Google Ads: Keyword Ideas": { "main": [[ { "node": "Split Out1", "type": "main", "index": 0 } ]] },
+    "Error? Skip Location": { "main": [ [ { "node": "Loop over states", "type": "main", "index": 0 } ], [ { "node": "Wait 3s", "type": "main", "index": 0 } ] ] },
+    "Wait 3s": { "main": [[ { "node": "Split Out", "type": "main", "index": 0 } ]] },
+    "Skip If Done": { "main": [ [ { "node": "Loop over states", "type": "main", "index": 0 } ], [ { "node": "Google Ads API", "type": "main", "index": 0 } ] ] },
+    "Get Row Count": { "main": [[ { "node": "Skip If Done", "type": "main", "index": 0 } ]] },
+    "Google Ads API": { "main": [[ { "node": "Error? Skip Location", "type": "main", "index": 0 } ]] },
+    "Split Out": { "main": [[ { "node": "Filter Zero Volume (Historical)", "type": "main", "index": 0 } ]] },
+    "Filter Zero Volume (Historical)": { "main": [[ { "node": "Append or update row in sheet", "type": "main", "index": 0 } ]] },
+    "Append or update row in sheet": { "main": [[ { "node": "Loop over states", "type": "main", "index": 0 } ]] },
+    "Loop over states": { "main": [ [ { "node": "Respond to Webhook", "type": "main", "index": 0 } ], [ { "node": "Get Row Count", "type": "main", "index": 0 } ] ] },
+    "Code in JavaScript": { "main": [[ { "node": "Loop over states", "type": "main", "index": 0 } ]] },
+    "Aggregate": { "main": [[ { "node": "Code in JavaScript", "type": "main", "index": 0 } ]] },
+    "Read Keywords from Sheet": { "main": [[ { "node": "Google Ads: Keyword Ideas", "type": "main", "index": 0 } ]] },
+    "Get row(s) in sheet": { "main": [[ { "node": "Aggregate", "type": "main", "index": 0 } ]] },
+    "Split Out1": { "main": [[ { "node": "Filter Zero Volume (Ideas)", "type": "main", "index": 0 } ]] },
+    "Filter Zero Volume (Ideas)": { "main": [ [ { "node": "Append row in sheet", "type": "main", "index": 0 }, { "node": "Append or update row in sheet1", "type": "main", "index": 0 } ] ] },
+    "Webhook": { "main": [[ { "node": "Config", "type": "main", "index": 0 } ]] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1", "binaryMode": "separate" },
+  "versionId": "612b9a4b-5e29-4b2f-b233-e4a2e99e90ef",
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "45313ac37c6a06c374ac2b05aca0a24bf24dec77d4b92b15dacbf43b6067af5d" },
+  "nodeGroups": [],
+  "id": "dvnFcjBt1tWj7Zc5",
+  "tags": []
+}

@@ -1256,16 +1256,8 @@ function renderAsTable(data) {
   return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
-function isDebugMode() {
-  return new URLSearchParams(window.location.search).get("debug") === "1";
-}
-
 function renderDebugPanel(type, payload, response) {
   const panel = document.getElementById("debug-panel");
-  if (!isDebugMode()) {
-    panel.style.display = "none";
-    return;
-  }
   panel.style.display = "block";
   panel.innerHTML = `
     <h3>Debug Info &mdash; ${escapeHtml(type)}</h3>
@@ -1291,10 +1283,12 @@ function parseSheetId(val) {
 }
 
 async function submitRequest(type) {
+  // IMPORTANT: read every form field BEFORE calling renderLoading(). renderLoading()
+  // replaces the #app container's contents with the spinner markup, which destroys
+  // the form (input, toggles, checkboxes, selects) that lives inside #app. Reading
+  // fields after that point returns null / silently-wrong defaults.
   const inputEl = document.getElementById("tool-input");
   const typedValue = inputEl ? inputEl.value.trim() : "";
-
-  renderLoading();
 
   // sheetUrl accepts either a full Google Sheets URL or a raw sheet ID -
   // the n8n Config node extracts the ID either way, so send whatever the
@@ -1312,7 +1306,9 @@ async function submitRequest(type) {
     }
   }
 
-  // Location toggle
+  // Location toggle - always send an explicit allLocations flag, and always
+  // send the locations array whenever it's not the "everything" case, so the
+  // payload never depends on a value silently defaulting on the backend.
   const allLocationsToggle = document.getElementById("all-locations-toggle");
   const allLocations = allLocationsToggle ? allLocationsToggle.checked : true;
   payload.allLocations = allLocations;
@@ -1321,15 +1317,23 @@ async function submitRequest(type) {
     payload.locations = selected;
   }
 
-  // Date range toggle - only send explicit fields when the user opted into a custom range,
-  // otherwise the n8n Config node defaults to trailing 12 months.
-  const customRangeToggle = document.getElementById("custom-daterange-toggle");
-  if (customRangeToggle && customRangeToggle.checked) {
-    payload.startMonth = document.getElementById("start-month").value;
-    payload.startYear = Number(document.getElementById("start-year").value);
-    payload.endMonth = document.getElementById("end-month").value;
-    payload.endYear = Number(document.getElementById("end-year").value);
-  }
+  // Date range - always send explicit start/end values. The selects are
+  // pre-populated with the trailing-12-months default (see
+  // setupDateRangeFields) even when the "Custom Date Range" toggle is off,
+  // so reading them directly here means the payload always reflects exactly
+  // what's shown on screen instead of being silently omitted.
+  const startMonthEl = document.getElementById("start-month");
+  const startYearEl = document.getElementById("start-year");
+  const endMonthEl = document.getElementById("end-month");
+  const endYearEl = document.getElementById("end-year");
+  if (startMonthEl) payload.startMonth = startMonthEl.value;
+  if (startYearEl) payload.startYear = Number(startYearEl.value);
+  if (endMonthEl) payload.endMonth = endMonthEl.value;
+  if (endYearEl) payload.endYear = Number(endYearEl.value);
+
+  // Now it's safe to swap the form out for the loading spinner - every field
+  // we need has already been read into `payload` above.
+  renderLoading();
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
