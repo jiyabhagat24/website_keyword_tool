@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="midnight">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,405 +8,248 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  /* Base CSS Variables for Theme Themes */
-  :root, [data-theme="midnight"] {
-    --bg: #090d16;
-    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-                        radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.12) 0%, transparent 40%),
-                        radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 60%);
-    --surface: rgba(17, 24, 39, 0.75);
-    --surface-card: #111827;
-    --surface-hover: #1f2937;
-    --surface-border: rgba(255, 255, 255, 0.1);
-    --surface-border-glow: rgba(99, 102, 241, 0.3);
-    --input-bg: rgba(15, 23, 42, 0.8);
-    
-    --text-primary: #f9fafb;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
-    
-    --accent-indigo: #6366f1;
-    --accent-indigo-hover: #4f46e5;
-    --accent-cyan: #06b6d4;
-    --accent-emerald: #10b981;
-    --accent-amber: #f59e0b;
-    
-    --error: #ef4444;
-    --error-bg: rgba(239, 68, 68, 0.12);
-    --error-border: rgba(239, 68, 68, 0.3);
-    
-    --shadow-lg: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
-    --shadow-glow: 0 0 25px rgba(99, 102, 241, 0.2);
-  }
-
-  [data-theme="light"] {
-    --bg: #f1f5f9;
-    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
-                        radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
-    --surface: rgba(255, 255, 255, 0.85);
-    --surface-card: #ffffff;
-    --surface-hover: #f8fafc;
-    --surface-border: rgba(0, 0, 0, 0.08);
-    --surface-border-glow: rgba(99, 102, 241, 0.3);
-    --input-bg: #ffffff;
-    
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    
-    --accent-indigo: #4f46e5;
-    --accent-indigo-hover: #4338ca;
-    --accent-cyan: #0284c7;
-    --accent-emerald: #059669;
-    --accent-amber: #d97706;
-    
-    --error: #dc2626;
-    --error-bg: #fef2f2;
-    --error-border: #fca5a5;
-    
-    --shadow-lg: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
-    --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.15);
-  }
-
-  [data-theme="cyberpunk"] {
-    --bg: #0a0512;
-    --bg-gradient: radial-gradient(circle at 20% 20%, rgba(255, 0, 127, 0.2) 0%, transparent 45%),
-                        radial-gradient(circle at 80% 80%, rgba(0, 240, 255, 0.2) 0%, transparent 45%);
-    --surface: rgba(20, 10, 35, 0.85);
-    --surface-card: #130a24;
-    --surface-hover: #21113b;
-    --surface-border: rgba(255, 0, 127, 0.3);
-    --surface-border-glow: rgba(0, 240, 255, 0.5);
-    --input-bg: rgba(13, 6, 24, 0.9);
-    
-    --text-primary: #ffffff;
-    --text-secondary: #d8b4fe;
-    --text-muted: #9333ea;
-    
-    --accent-indigo: #ff007f;
-    --accent-indigo-hover: #e00070;
-    --accent-cyan: #00f0ff;
-    --accent-emerald: #10b981;
-    --accent-amber: #facc15;
-    
-    --shadow-lg: 0 20px 40px -15px rgba(255, 0, 127, 0.3);
-    --shadow-glow: 0 0 30px rgba(0, 240, 255, 0.3);
-  }
-
-  [data-theme="emerald"] {
-    --bg: #040d0c;
-    --bg-gradient: radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.2) 0%, transparent 45%),
-                        radial-gradient(circle at 80% 80%, rgba(52, 211, 153, 0.12) 0%, transparent 45%);
-    --surface: rgba(6, 24, 22, 0.8);
-    --surface-card: #09201d;
-    --surface-hover: #0f332e;
-    --surface-border: rgba(16, 185, 129, 0.2);
-    --surface-border-glow: rgba(52, 211, 153, 0.4);
-    --input-bg: rgba(4, 16, 14, 0.9);
-    
-    --text-primary: #ecfdf5;
-    --text-secondary: #a7f3d0;
-    --text-muted: #059669;
-    
-    --accent-indigo: #10b981;
-    --accent-indigo-hover: #059669;
-    --accent-cyan: #34d399;
-    --accent-emerald: #6ee7b7;
-    --accent-amber: #f59e0b;
-    
-    --shadow-lg: 0 20px 40px -15px rgba(6, 78, 59, 0.5);
-    --shadow-glow: 0 0 25px rgba(16, 185, 129, 0.25);
-  }
-
-  [data-theme="nordic"] {
-    --bg: #0f172a;
-    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.15) 0%, transparent 40%),
-                        radial-gradient(circle at 85% 85%, rgba(45, 212, 191, 0.12) 0%, transparent 40%);
-    --surface: rgba(30, 41, 59, 0.75);
-    --surface-card: #1e293b;
-    --surface-hover: #334155;
-    --surface-border: rgba(56, 189, 248, 0.2);
-    --surface-border-glow: rgba(56, 189, 248, 0.4);
-    --input-bg: rgba(15, 23, 42, 0.85);
-    
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    
-    --accent-indigo: #38bdf8;
-    --accent-indigo-hover: #0284c7;
-    --accent-cyan: #2dd4bf;
-    --accent-emerald: #34d399;
-    --accent-amber: #fbbf24;
-    
-    --shadow-lg: 0 20px 40px -15px rgba(15, 23, 42, 0.6);
-    --shadow-glow: 0 0 25px rgba(56, 189, 248, 0.25);
-  }
-
-  [data-theme="sunset"] {
-    --bg: #14091f;
-    --bg-gradient: radial-gradient(circle at 15% 15%, rgba(244, 63, 94, 0.2) 0%, transparent 45%),
-                        radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.2) 0%, transparent 45%);
-    --surface: rgba(32, 17, 48, 0.8);
-    --surface-card: #201233;
-    --surface-hover: #311c4d;
-    --surface-border: rgba(244, 63, 94, 0.25);
-    --surface-border-glow: rgba(139, 92, 246, 0.4);
-    --input-bg: rgba(19, 8, 31, 0.9);
-    
-    --text-primary: #fff1f2;
-    --text-secondary: #f472b6;
-    --text-muted: #a21caf;
-    
-    --accent-indigo: #f43f5e;
-    --accent-indigo-hover: #e11d48;
-    --accent-cyan: #a855f7;
-    --accent-emerald: #10b981;
-    --accent-amber: #fbbf24;
-    
-    --shadow-lg: 0 20px 40px -15px rgba(76, 5, 25, 0.5);
-    --shadow-glow: 0 0 25px rgba(244, 63, 94, 0.25);
-  }
-
+  /* Single theme, tuned to feel like a native Apple surface: translucent
+     materials, a restrained accent, and type that tightens as it grows. */
   :root {
+    --bg-0: #ede4d8;
+    --bg-1: #f9f4ec;
+    --bg-gradient: radial-gradient(circle at 50% -10%, rgba(139, 106, 74, 0.10) 0%, transparent 55%);
+
+    --surface: rgba(255, 251, 245, 0.74);
+    --surface-hover: rgba(112, 84, 58, 0.06);
+    --surface-border: rgba(112, 84, 58, 0.14);
+    --surface-edge: rgba(255, 253, 248, 0.92);
+    --input-bg: rgba(112, 84, 58, 0.05);
+    --fill-tertiary: rgba(150, 118, 88, 0.16);
+
+    --text-primary: #2e241c;
+    --text-secondary: rgba(74, 58, 46, 0.68);
+    --text-muted: rgba(74, 58, 46, 0.42);
+
+    --accent: #a9673a;
+    --accent-hover: #91542c;
+    --success: #5c8a4a;
+    --error: #c0503a;
+    --error-bg: rgba(192, 80, 58, 0.09);
+    --error-border: rgba(192, 80, 58, 0.24);
+
+    --shadow-lg: 0 20px 40px -22px rgba(46, 36, 28, 0.22);
+    --shadow-glow: 0 0 0 3px rgba(169, 103, 58, 0.2);
+
     --radius-xl: 20px;
-    --radius-lg: 14px;
+    --radius-lg: 13px;
     --radius-md: 10px;
-    --radius-sm: 6px;
+
+    /* Critically damped feel (no overshoot) for tapped, non-gestural UI */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   }
 
   * { box-sizing: border-box; }
+  ::selection { background: rgba(169, 103, 58, 0.22); }
+
+  @keyframes app-enter {
+    from { opacity: 0; transform: translateY(6px) scale(0.99); filter: blur(4px); }
+    to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  }
+
+  #app.app-enter {
+    animation: app-enter 320ms var(--ease-out);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #app.app-enter { animation: opacity 200ms ease; transform: none !important; }
+  }
 
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: var(--bg);
-    background-image: var(--bg-gradient);
+    background-color: var(--bg-0);
+    background-image:
+      var(--bg-gradient),
+      linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 100%);
     background-attachment: fixed;
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Plus Jakarta Sans", system-ui, sans-serif;
+    font-size: 100%;
+    line-height: 1.5;
     color: var(--text-primary);
-    padding: 32px 20px;
+    padding: 48px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    transition: background 0.3s ease, color 0.3s ease;
   }
 
-  /* Theme Switcher Navigation Bar */
-  .theme-switcher-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--surface);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--surface-border);
-    padding: 6px 10px;
-    border-radius: 40px;
-    margin-bottom: 24px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    flex-wrap: wrap;
-    justify-content: center;
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --surface: #fffaf3;
+      --input-bg: #ede4d8;
+    }
+    .card { backdrop-filter: none; -webkit-backdrop-filter: none; }
   }
 
-  .theme-label {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 0 8px;
-  }
-
-  .theme-btn {
-    padding: 6px 12px;
-    font-size: 0.8rem;
-    border-radius: 20px;
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text-secondary);
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .theme-btn:hover {
-    color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .theme-btn.active {
-    background: var(--accent-indigo);
-    color: #ffffff;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  @media (prefers-contrast: more) {
+    :root { --surface-border: rgba(74, 58, 46, 0.35); }
+    .card { background: #fffaf3; }
   }
 
   .page-header {
     text-align: center;
-    max-width: 700px;
-    margin-bottom: 32px;
+    max-width: 620px;
+    margin-bottom: 40px;
   }
 
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    border-radius: 30px;
-    background: rgba(99, 102, 241, 0.12);
-    border: 1px solid rgba(99, 102, 241, 0.25);
-    color: var(--accent-indigo);
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-  }
-
-  .badge-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent-indigo);
-    box-shadow: 0 0 8px var(--accent-indigo);
-  }
-
+  /* Large display text: tight leading, negative tracking as size grows */
   .page-header h1 {
-    font-size: 2.2rem;
-    font-weight: 800;
+    font-size: clamp(1.9rem, 4vw, 2.3rem);
+    font-weight: 700;
     margin: 0 0 10px;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
   }
 
   .page-header p {
     color: var(--text-secondary);
-    font-size: 1rem;
+    font-size: 0.98rem;
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.55;
+    letter-spacing: -0.005em;
   }
 
-  /* Two-column Layout Container */
   .layout-container {
     display: grid;
     grid-template-columns: 1.1fr 1fr;
-    gap: 28px;
+    gap: 24px;
     width: 100%;
-    max-width: 1140px;
+    max-width: 1100px;
     align-items: start;
   }
 
-  /* Glass Card Styling */
+  /* Glass material: blur + saturation, bright top edge where light "catches" it */
   .card {
     background: var(--surface);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid var(--surface-border);
+    border-top-color: var(--surface-edge);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-lg);
-    padding: 32px;
-    position: relative;
-    overflow: hidden;
-    transition: background 0.3s ease, border-color 0.3s ease;
-  }
-
-  .card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent-indigo), var(--accent-cyan), transparent);
-    opacity: 0.8;
+    padding: 28px;
   }
 
   .card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
     border-bottom: 1px solid var(--surface-border);
   }
 
   .card-title {
-    font-size: 1.25rem;
+    font-size: 1.08rem;
     font-weight: 700;
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
-    color: var(--text-primary);
+    gap: 9px;
+    letter-spacing: -0.01em;
   }
 
   .card-title svg {
-    color: var(--accent-indigo);
+    color: var(--accent);
+    width: 19px;
+    height: 19px;
   }
 
-  /* Left Column: Main Tool Card */
+  .mode-badge {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
   .main-tool-card {
-    min-height: 480px;
+    min-height: 460px;
     display: flex;
     flex-direction: column;
   }
 
-  .btn-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-top: 10px;
+  /* Segmented control — the toggle between Website Tool and Keyword Tool */
+  .segmented {
+    position: relative;
+    display: flex;
+    background: var(--fill-tertiary);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    margin-bottom: 20px;
+    isolation: isolate;
   }
 
-  button {
-    font-family: inherit;
-    cursor: pointer;
-    border: none;
-    border-radius: var(--radius-lg);
+  .segmented input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  .segmented label {
+    flex: 1;
+    text-align: center;
+    padding: 9px 10px;
+    border-radius: 8px;
     font-weight: 600;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .main-btn {
-    padding: 28px 20px;
-    font-size: 1.1rem;
-    background: var(--surface-hover);
-    border: 1px solid var(--surface-border);
-    color: var(--text-primary);
+    font-size: 0.87rem;
+    letter-spacing: -0.005em;
+    color: var(--text-secondary);
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    position: relative;
-    overflow: hidden;
+    gap: 6px;
+    transition: color 200ms var(--ease-out);
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .main-btn svg {
-    width: 32px;
-    height: 32px;
-    transition: transform 0.2s ease;
+  .segmented label svg {
+    width: 15px;
+    height: 15px;
   }
 
-  .main-btn:hover {
-    border-color: var(--surface-border-glow);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-glow);
+  .segmented input:checked + label {
+    color: var(--text-primary);
   }
 
-  .main-btn:hover svg {
-    transform: scale(1.1);
+  .segmented label:active {
+    transform: scale(0.98);
   }
 
-  .main-btn-website svg { color: var(--accent-indigo); }
-  .main-btn-keywords svg { color: var(--accent-cyan); }
+  .segmented-thumb {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc(50% - 3px);
+    background: #fffaf3;
+    border: 0.5px solid rgba(112, 84, 58, 0.06);
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(46, 36, 28, 0.16), 0 0 0 0.5px rgba(112, 84, 58, 0.04);
+    transition: transform 320ms var(--ease-out);
+    z-index: 0;
+  }
 
-  /* Forms & Inputs */
+  #mode-keywords:checked ~ .segmented-thumb {
+    transform: translateX(100%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .segmented-thumb { transition: none; }
+  }
+
   form {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 16px;
   }
 
   .form-group {
@@ -415,10 +258,9 @@
     gap: 8px;
   }
 
-  label {
+  label.field-label-row {
     font-weight: 600;
-    font-size: 0.92rem;
-    color: var(--text-primary);
+    font-size: 0.88rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -426,59 +268,68 @@
 
   .label-hint {
     font-weight: 400;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
   }
 
-  input[type="text"], textarea {
-    padding: 14px 16px;
+  input[type="text"] {
+    padding: 13px 15px;
     background: var(--input-bg);
     border: 1px solid var(--surface-border);
     border-radius: var(--radius-md);
-    font-size: 0.95rem;
+    font-size: 0.94rem;
     font-family: inherit;
     color: var(--text-primary);
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
   }
 
-  input[type="text"]:focus, textarea:focus {
-    border-color: var(--accent-indigo);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  input[type="text"]::placeholder { color: var(--text-muted); }
+
+  input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-glow);
   }
 
   .form-actions {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
-    margin-top: 8px;
+    margin-top: 4px;
+  }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    transition: transform 100ms ease-out, background-color 160ms var(--ease-out),
+                border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), color 160ms var(--ease-out);
   }
 
   .primary-btn {
     flex: 1;
-    padding: 14px 24px;
-    background: var(--accent-indigo);
+    padding: 13px 22px;
+    background: var(--accent);
     color: white;
-    font-size: 1rem;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+    font-size: 0.96rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
   }
 
-  .primary-btn:hover {
-    background: var(--accent-indigo-hover);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-glow);
-  }
+  .primary-btn:hover { background: var(--accent-hover); }
+  .primary-btn:active { transform: scale(0.97); }
 
   .secondary-btn {
-    padding: 14px 20px;
-    background: rgba(255, 255, 255, 0.05);
+    padding: 13px 18px;
+    background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--surface-border);
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -490,46 +341,44 @@
     color: var(--text-primary);
   }
 
+  .secondary-btn:active { transform: scale(0.97); }
+
   .sheet-link {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 12px 18px;
-    background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    color: var(--accent-emerald);
+    gap: 7px;
+    padding: 11px 16px;
+    background: rgba(169, 103, 58, 0.12);
+    border: 1px solid rgba(169, 103, 58, 0.26);
+    color: var(--accent);
     text-decoration: none;
     border-radius: var(--radius-md);
     font-weight: 600;
-    font-size: 0.92rem;
-    transition: all 0.2s ease;
+    font-size: 0.9rem;
+    transition: background-color 160ms var(--ease-out), transform 100ms ease-out;
   }
 
-  .sheet-link:hover {
-    background: rgba(16, 185, 129, 0.22);
-    border-color: var(--accent-emerald);
-    transform: translateY(-1px);
-  }
+  .sheet-link:hover { background: rgba(169, 103, 58, 0.2); }
+  .sheet-link:active { transform: scale(0.97); }
 
-  /* Status States */
   .loading {
     text-align: center;
-    padding: 48px 20px;
+    padding: 44px 20px;
     color: var(--text-secondary);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
   }
 
   .spinner {
-    width: 42px;
-    height: 42px;
-    border: 3px solid rgba(99, 102, 241, 0.15);
-    border-top-color: var(--accent-indigo);
+    width: 34px;
+    height: 34px;
+    border: 3px solid rgba(169, 103, 58, 0.15);
+    border-top-color: var(--accent);
     border-radius: 50%;
-    animation: spin 0.8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite;
+    animation: spin 0.7s linear infinite;
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -538,32 +387,34 @@
     background: var(--error-bg);
     border: 1px solid var(--error-border);
     color: var(--error);
-    padding: 16px;
+    padding: 15px;
     border-radius: var(--radius-md);
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     line-height: 1.5;
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
   }
 
   .pending-box {
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    color: var(--accent-emerald);
+    background: rgba(92, 138, 74, 0.08);
+    border: 1px solid rgba(92, 138, 74, 0.2);
+    color: var(--text-primary);
     border-radius: var(--radius-md);
-    padding: 20px;
-    font-size: 0.95rem;
-    line-height: 1.6;
+    padding: 18px;
+    font-size: 0.92rem;
+    line-height: 1.55;
   }
+
+  .pending-box strong { color: var(--success); }
 
   .result-box {
     background: var(--input-bg);
     border: 1px solid var(--surface-border);
     border-radius: var(--radius-md);
-    padding: 18px;
+    padding: 16px;
     overflow-x: auto;
-    max-height: 360px;
+    max-height: 340px;
   }
 
   pre {
@@ -571,156 +422,142 @@
     white-space: pre-wrap;
     word-break: break-word;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
-    color: var(--accent-emerald);
+    font-size: 0.82rem;
+    color: var(--text-secondary);
   }
 
   table {
     border-collapse: collapse;
     width: 100%;
-    font-size: 0.88rem;
+    font-size: 0.85rem;
   }
 
   th, td {
     border: 1px solid var(--surface-border);
-    padding: 10px 12px;
+    padding: 9px 11px;
     text-align: left;
   }
 
   th {
     background: var(--surface-hover);
-    color: var(--accent-cyan);
+    color: var(--text-primary);
     font-weight: 600;
-  }
-
-  /* Right Column: Instructions Panel */
-  .instructions-card {
-    border-color: var(--surface-border);
   }
 
   .steps-list {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
   }
 
   .step-item {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     position: relative;
   }
 
   .step-item:not(:last-child)::after {
     content: '';
     position: absolute;
-    left: 18px;
-    top: 40px;
-    bottom: -16px;
-    width: 2px;
+    left: 16px;
+    top: 36px;
+    bottom: -14px;
+    width: 1px;
     background: var(--surface-border);
   }
 
   .step-number {
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
     border-radius: 50%;
-    background: rgba(99, 102, 241, 0.15);
-    border: 1px solid var(--surface-border-glow);
-    color: var(--accent-indigo);
+    background: rgba(169, 103, 58, 0.12);
+    border: 1px solid rgba(169, 103, 58, 0.26);
+    color: var(--accent);
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.86rem;
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
-  .step-content {
-    flex: 1;
-  }
+  .step-content { flex: 1; }
 
   .step-title {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 6px;
+    margin: 0 0 5px;
+    letter-spacing: -0.01em;
   }
 
   .step-desc {
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: 1.55;
     margin: 0;
   }
 
-  /* Improved Full URL Breakdown Box */
+  .step-desc code {
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.82em;
+  }
+
   .url-guide-box {
-    margin-top: 12px;
+    margin-top: 10px;
     background: var(--input-bg);
     border: 1px solid var(--surface-border);
     border-radius: var(--radius-md);
-    padding: 14px;
+    padding: 12px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.8rem;
-    line-height: 1.8;
+    font-size: 0.76rem;
+    line-height: 1.7;
     word-break: break-all;
-    white-space: normal;
-    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
   }
 
-  .url-prefix, .url-suffix {
-    color: var(--text-muted);
-  }
+  .url-prefix, .url-suffix { color: var(--text-muted); }
 
   .url-sheet-id {
     display: inline-block;
-    background: rgba(245, 158, 11, 0.22);
-    border: 1px dashed var(--accent-amber);
-    color: var(--accent-amber);
-    padding: 2px 8px;
-    border-radius: 6px;
+    color: var(--accent);
     font-weight: 700;
     word-break: break-all;
-    margin: 2px 0;
   }
 
   .guide-annotation {
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.78rem;
-    color: var(--accent-amber);
-    font-weight: 600;
+    margin-top: 8px;
+    font-size: 0.76rem;
+    color: var(--text-muted);
   }
 
   .debug-panel {
     display: none;
-    margin-top: 24px;
-    padding: 16px;
+    margin-top: 20px;
+    padding: 14px;
     background: var(--input-bg);
     border: 1px solid var(--surface-border);
     color: var(--text-secondary);
     border-radius: var(--radius-md);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-family: 'JetBrains Mono', monospace;
   }
 
   .debug-panel h3 {
-    margin: 0 0 10px;
-    font-size: 0.8rem;
+    margin: 0 0 8px;
+    font-size: 0.76rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--accent-cyan);
+    color: var(--text-muted);
   }
 
-  /* Toggle switch */
   .toggle-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 10px 14px;
+    padding: 10px 13px;
     background: var(--input-bg);
     border: 1px solid var(--surface-border);
     border-radius: var(--radius-md);
@@ -734,20 +571,19 @@
 
   .toggle-row .toggle-title {
     font-weight: 600;
-    font-size: 0.92rem;
-    color: var(--text-primary);
+    font-size: 0.9rem;
   }
 
   .toggle-row .toggle-hint {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     color: var(--text-muted);
   }
 
   .switch {
     position: relative;
     display: inline-block;
-    width: 44px;
-    height: 24px;
+    width: 40px;
+    height: 22px;
     flex-shrink: 0;
   }
 
@@ -757,9 +593,8 @@
     position: absolute;
     cursor: pointer;
     top: 0; left: 0; right: 0; bottom: 0;
-    background-color: var(--surface-hover);
-    border: 1px solid var(--surface-border);
-    transition: 0.2s;
+    background-color: var(--fill-tertiary);
+    transition: background-color 200ms var(--ease-out);
     border-radius: 24px;
   }
 
@@ -769,28 +604,26 @@
     height: 18px;
     width: 18px;
     left: 2px;
-    bottom: 2px;
-    background-color: var(--text-secondary);
-    transition: 0.2s;
+    top: 2px;
+    background-color: #fffaf3;
+    box-shadow: 0 1px 3px rgba(46, 36, 28, 0.24);
+    transition: transform 200ms var(--ease-out);
     border-radius: 50%;
   }
 
   .switch input:checked + .switch-slider {
-    background-color: var(--accent-indigo);
-    border-color: var(--accent-indigo);
+    background-color: var(--accent);
   }
 
   .switch input:checked + .switch-slider::before {
-    transform: translateX(20px);
-    background-color: #ffffff;
+    transform: translateX(18px);
   }
 
-  /* Location checkbox grid */
   .location-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
     gap: 6px 10px;
-    max-height: 220px;
+    max-height: 200px;
     overflow-y: auto;
     padding: 12px;
     background: var(--input-bg);
@@ -800,17 +633,16 @@
 
   .location-grid label {
     font-weight: 400;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
     display: flex;
     align-items: center;
     gap: 6px;
-    justify-content: flex-start;
     cursor: pointer;
   }
 
   .location-grid input[type="checkbox"] {
-    accent-color: var(--accent-indigo);
+    accent-color: var(--accent);
     width: 14px;
     height: 14px;
     cursor: pointer;
@@ -825,8 +657,8 @@
   .location-actions button {
     background: none;
     border: none;
-    color: var(--accent-cyan);
-    font-size: 0.78rem;
+    color: var(--accent);
+    font-size: 0.76rem;
     font-weight: 600;
     cursor: pointer;
     padding: 0;
@@ -834,73 +666,67 @@
 
   .location-actions button:hover { text-decoration: underline; }
 
+  .collapse-wrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 220ms var(--ease-out), opacity 170ms var(--ease-out);
+  }
+
+  .collapse-wrap.open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+
+  .collapse-wrap > .collapse-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+
   .daterange-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 10px;
   }
 
   .daterange-grid .field-label {
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
   }
 
   select {
     width: 100%;
-    padding: 12px 14px;
+    padding: 11px 13px;
     background: var(--input-bg);
     border: 1px solid var(--surface-border);
     border-radius: var(--radius-md);
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     font-family: inherit;
     color: var(--text-primary);
     outline: none;
+    transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
   }
 
   select:focus {
-    border-color: var(--accent-indigo);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-glow);
   }
 
-  /* Responsive media query */
   @media (max-width: 900px) {
-    .layout-container {
-      grid-template-columns: 1fr;
-    }
-    
-    .page-header h1 {
-      font-size: 1.8rem;
-    }
-    
-    .card {
-      padding: 24px 20px;
-    }
+    .layout-container { grid-template-columns: 1fr; }
+    .page-header h1 { font-size: 1.65rem; }
+    .card { padding: 22px 18px; }
   }
 </style>
 </head>
 <body>
 
-<!-- Theme Switcher Navigation Bar -->
-<div class="theme-switcher-bar">
-  <span class="theme-label">Theme Studio:</span>
-  <button class="theme-btn active" data-theme-id="midnight" onclick="setTheme('midnight')">🌌 Midnight</button>
-  <button class="theme-btn" data-theme-id="light" onclick="setTheme('light')">☀️ Light</button>
-  <button class="theme-btn" data-theme-id="cyberpunk" onclick="setTheme('cyberpunk')">⚡ Cyberpunk</button>
-  <button class="theme-btn" data-theme-id="emerald" onclick="setTheme('emerald')">🌲 Emerald</button>
-  <button class="theme-btn" data-theme-id="nordic" onclick="setTheme('nordic')">❄️ Nordic</button>
-  <button class="theme-btn" data-theme-id="sunset" onclick="setTheme('sunset')">🌆 Sunset</button>
-</div>
-
 <div class="page-header">
-  <div class="badge">
-    <span class="badge-dot"></span> Automation & Intelligence Hub
-  </div>
   <h1>Website & Keyword Analysis</h1>
-  <p>Run automated web scrapes, SEO keyword research, and sync data directly to your personal Google Sheets.</p>
 </div>
 
 <div class="layout-container">
@@ -908,10 +734,25 @@
   <div class="card main-tool-card">
     <div class="card-header">
       <h2 class="card-title">
-        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         Tool Launcher
       </h2>
-      <span id="active-mode-badge" style="font-size:0.8rem; color:var(--text-muted);">Select a tool</span>
+      <span id="active-mode-badge" class="mode-badge">Website Analysis</span>
+    </div>
+
+    <!-- Toggle between Website Tool and Keyword Tool -->
+    <div class="segmented">
+      <input type="radio" name="tool-mode" id="mode-website" checked>
+      <label for="mode-website">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+        Website Tool
+      </label>
+      <input type="radio" name="tool-mode" id="mode-keywords">
+      <label for="mode-keywords">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
+        Keyword Tool
+      </label>
+      <div class="segmented-thumb"></div>
     </div>
 
     <div id="app" style="flex:1; display:flex; flex-direction:column; justify-content:center;"></div>
@@ -919,60 +760,53 @@
     <div id="debug-panel" class="debug-panel"></div>
   </div>
 
-  <!-- RIGHT COLUMN: Step-by-Step Instructions & Sheet ID Navigation -->
+  <!-- RIGHT COLUMN: Step-by-Step Instructions -->
   <div class="card instructions-card">
     <div class="card-header">
       <h2 class="card-title">
-        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
         Quick Start Guide
       </h2>
     </div>
 
     <div class="steps-list">
-      <!-- Step 1 -->
       <div class="step-item">
         <div class="step-number">1</div>
         <div class="step-content">
           <h3 class="step-title">Make a Copy of the Google Sheet</h3>
-          <p class="step-desc">Choose your desired tool on the left and click the <strong>Copy Template Google Sheet</strong> button. This opens the template in Google Sheets so you can make your own editable copy.</p>
+          <p class="step-desc">Pick a tool with the toggle on the left and click <strong>Copy Template Google Sheet</strong>. This opens the template so you can make your own editable copy.</p>
         </div>
       </div>
 
-      <!-- Step 2 -->
       <div class="step-item">
         <div class="step-number">2</div>
         <div class="step-content">
           <h3 class="step-title">Locate & Copy your Sheet ID</h3>
-          <p class="step-desc">Look at your browser's address bar when viewing your copied Google Sheet. Copy the entire ID string between <code>/d/</code> and <code>/edit</code>:</p>
-          
+          <p class="step-desc">Look at the browser address bar on your copied sheet. Copy the ID string between <code>/d/</code> and <code>/edit</code>:</p>
+
           <div class="url-guide-box">
             <span class="url-prefix">https://docs.google.com/spreadsheets/d/</span>
             <span class="url-sheet-id">1NEymr4St_ZgL5UUW_h4TGO8xbcy20Bu7V9edCuuIWkU</span>
             <span class="url-suffix">/edit#gid=0</span>
           </div>
-          
-          <div class="guide-annotation">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            The highlighted text in yellow above is the complete Sheet ID
-          </div>
+
+          <div class="guide-annotation">The highlighted text above is the complete Sheet ID.</div>
         </div>
       </div>
 
-      <!-- Step 3 -->
       <div class="step-item">
         <div class="step-number">3</div>
         <div class="step-content">
           <h3 class="step-title">Paste Sheet ID or URL & Inputs</h3>
-          <p class="step-desc">Paste the copied <strong>Sheet ID</strong> (or full URL) into the input box on the left, along with your target Website URL or comma-separated Keywords.</p>
+          <p class="step-desc">Paste the <strong>Sheet ID</strong> (or full URL) into the input box on the left, along with your target Website URL or comma-separated Keywords.</p>
         </div>
       </div>
 
-      <!-- Step 4 -->
       <div class="step-item">
         <div class="step-number">4</div>
         <div class="step-content">
           <h3 class="step-title">Submit & Track Results</h3>
-          <p class="step-desc">Hit <strong>Submit Request</strong>. The workflow triggers in the background and populates your Google Sheet with structured findings in under a minute.</p>
+          <p class="step-desc">Hit <strong>Submit Request</strong>. The workflow runs in the background and populates your Google Sheet in under a minute.</p>
         </div>
       </div>
     </div>
@@ -980,17 +814,6 @@
 </div>
 
 <script>
-function setTheme(themeName) {
-  document.documentElement.setAttribute('data-theme', themeName);
-  document.querySelectorAll('.theme-btn').forEach(btn => {
-    if (btn.dataset.themeId === themeName) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-}
-
 const WEBHOOKS = {
   website: "https://n8n.srv1799142.hstgr.cloud/webhook/a75792c3-2e98-446f-9cc7-8f10e294f28c",
   keywords: "https://n8n.srv1799142.hstgr.cloud/webhook/a50bc329-6f29-4833-9d72-306d7bacbb17"
@@ -1034,7 +857,7 @@ function setupLocationGrid() {
   `).join("");
 
   toggle.onchange = () => {
-    wrap.style.display = toggle.checked ? "none" : "block";
+    wrap.classList.toggle("open", !toggle.checked);
   };
 
   document.getElementById("loc-select-all").onclick = () => {
@@ -1070,43 +893,47 @@ function setupDateRangeFields() {
   document.getElementById("end-year").value = String(now.getFullYear());
 
   toggle.onchange = () => {
-    wrap.style.display = toggle.checked ? "block" : "none";
+    wrap.classList.toggle("open", toggle.checked);
   };
 }
 
 const app = document.getElementById("app");
 const modeBadge = document.getElementById("active-mode-badge");
 
-function renderHome() {
-  if (modeBadge) modeBadge.textContent = "Home";
-  app.innerHTML = `
-    <div class="btn-row">
-      <button class="main-btn main-btn-website" id="btn-website">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-        <span>Website Tool</span>
-      </button>
-      <button class="main-btn main-btn-keywords" id="btn-keywords">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
-        <span>Keyword Tool</span>
-      </button>
-    </div>
-  `;
-  document.getElementById("btn-website").onclick = () => renderConfirm("website");
-  document.getElementById("btn-keywords").onclick = () => renderConfirm("keywords");
+// The Website/Keyword segmented control lives outside #app (it's the
+// persistent navigation), so track which mode is active separately and
+// re-render the form whenever it changes.
+let activeType = "website";
+
+// Restarts the app-enter animation on the container. Called right after
+// app.innerHTML is replaced so every screen transition (Form -> Loading ->
+// Result/Error/Pending) gets a soft fade+blur entrance instead of an
+// instant, jarring swap.
+function replayEnter() {
+  app.classList.remove("app-enter");
+  void app.offsetWidth; // force reflow so the animation restarts
+  app.classList.add("app-enter");
 }
 
+document.getElementById("mode-website").addEventListener("change", (e) => {
+  if (e.target.checked) renderConfirm("website");
+});
+document.getElementById("mode-keywords").addEventListener("change", (e) => {
+  if (e.target.checked) renderConfirm("keywords");
+});
+
 function renderConfirm(type) {
+  activeType = type;
   const isWebsite = type === "website";
   if (modeBadge) modeBadge.textContent = isWebsite ? "Website Analysis" : "Keyword Research";
-  
+
   app.innerHTML = `
     <form onsubmit="return false;">
       <div class="form-group">
-        <label for="tool-input">
-          ${isWebsite ? "Sheet ID or Website URL" : "Sheet ID or Keywords List"}
-          <span class="label-hint">${isWebsite ? "Paste Google Sheet ID / URL" : "Paste Sheet ID or comma-separated keywords"}</span>
+        <label class="field-label-row" for="tool-input">
+          Sheet URL
         </label>
-        <input type="text" id="tool-input" placeholder="${isWebsite ? 'e.g. 1NEymr4St_ZgL5UUW... or https://example.com' : 'e.g. 1vwAPD9R3HKCKLHB... or keyword one, keyword two'}">
+        <input type="text" id="tool-input" placeholder="e.g. https://docs.google.com/spreadsheets/d/1NEymr4St_ZgL5UUW...">
       </div>
 
       <div style="display:flex; justify-content:flex-start; margin-top:2px;">
@@ -1127,12 +954,14 @@ function renderConfirm(type) {
             <span class="switch-slider"></span>
           </label>
         </div>
-        <div id="location-grid-wrap" style="display:none; margin-top:10px;">
-          <div class="location-actions">
-            <button type="button" id="loc-select-all">Select all</button>
-            <button type="button" id="loc-select-none">Clear</button>
+        <div id="location-grid-wrap" class="collapse-wrap" style="margin-top:10px;">
+          <div class="collapse-inner">
+            <div class="location-actions">
+              <button type="button" id="loc-select-all">Select all</button>
+              <button type="button" id="loc-select-none">Clear</button>
+            </div>
+            <div class="location-grid" id="location-grid"></div>
           </div>
-          <div class="location-grid" id="location-grid"></div>
         </div>
       </div>
 
@@ -1147,23 +976,25 @@ function renderConfirm(type) {
             <span class="switch-slider"></span>
           </label>
         </div>
-        <div id="daterange-fields" style="display:none; margin-top:10px;">
-          <div class="daterange-grid">
-            <div>
-              <div class="field-label">Start Month</div>
-              <select id="start-month"></select>
-            </div>
-            <div>
-              <div class="field-label">Start Year</div>
-              <select id="start-year"></select>
-            </div>
-            <div>
-              <div class="field-label">End Month</div>
-              <select id="end-month"></select>
-            </div>
-            <div>
-              <div class="field-label">End Year</div>
-              <select id="end-year"></select>
+        <div id="daterange-fields" class="collapse-wrap" style="margin-top:10px;">
+          <div class="collapse-inner">
+            <div class="daterange-grid">
+              <div>
+                <div class="field-label">Start Month</div>
+                <select id="start-month"></select>
+              </div>
+              <div>
+                <div class="field-label">Start Year</div>
+                <select id="start-year"></select>
+              </div>
+              <div>
+                <div class="field-label">End Month</div>
+                <select id="end-month"></select>
+              </div>
+              <div>
+                <div class="field-label">End Year</div>
+                <select id="end-year"></select>
+              </div>
             </div>
           </div>
         </div>
@@ -1174,11 +1005,10 @@ function renderConfirm(type) {
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
           Submit Request
         </button>
-        <button type="button" class="secondary-btn" id="back-btn">Back</button>
       </div>
     </form>
   `;
-  document.getElementById("back-btn").onclick = renderHome;
+  replayEnter();
   document.getElementById("submit-btn").onclick = () => submitRequest(type);
   setupLocationGrid();
   setupDateRangeFields();
@@ -1194,6 +1024,7 @@ function renderLoading() {
       </div>
     </div>
   `;
+  replayEnter();
 }
 
 function renderError(type, message) {
@@ -1203,16 +1034,17 @@ function renderError(type, message) {
       <div>${escapeHtml(message)}</div>
     </div>
     <div class="footer-actions form-actions" style="margin-top: 20px;">
-      <button class="secondary-btn" id="retry-btn">Try Again / Back</button>
+      <button class="secondary-btn" id="retry-btn">Try Again</button>
     </div>
   `;
+  replayEnter();
   document.getElementById("retry-btn").onclick = () => renderConfirm(type);
 }
 
 function renderPending(type) {
   app.innerHTML = `
     <div class="pending-box">
-      <strong>✨ Request Submitted Successfully!</strong><br/>
+      <strong>Request submitted successfully.</strong><br/>
       Your task is being processed. The results will automatically populate your Google Sheet shortly (usually within 30-60 seconds).
     </div>
     <div style="margin-top:16px;">
@@ -1222,10 +1054,11 @@ function renderPending(type) {
       </a>
     </div>
     <div class="footer-actions form-actions" style="margin-top:20px;">
-      <button class="secondary-btn" id="reset-btn">Back to Start</button>
+      <button class="secondary-btn" id="reset-btn">Start Over</button>
     </div>
   `;
-  document.getElementById("reset-btn").onclick = renderHome;
+  replayEnter();
+  document.getElementById("reset-btn").onclick = () => renderConfirm(activeType);
 }
 
 function renderResult(type, data) {
@@ -1237,10 +1070,11 @@ function renderResult(type, data) {
       <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">Open Google Sheet</a>
     </div>
     <div class="footer-actions form-actions" style="margin-top:20px;">
-      <button class="secondary-btn" id="reset-btn">Back to Start</button>
+      <button class="secondary-btn" id="reset-btn">Start Over</button>
     </div>
   `;
-  document.getElementById("reset-btn").onclick = renderHome;
+  replayEnter();
+  document.getElementById("reset-btn").onclick = () => renderConfirm(activeType);
 }
 
 function renderAsTable(data) {
@@ -1290,20 +1124,13 @@ async function submitRequest(type) {
   const inputEl = document.getElementById("tool-input");
   const typedValue = inputEl ? inputEl.value.trim() : "";
 
-  // sheetUrl accepts either a full Google Sheets URL or a raw sheet ID -
-  // the n8n Config node extracts the ID either way, so send whatever the
-  // user typed and fall back to the default template sheet.
+  // The input field only ever represents a Google Sheet - either a full
+  // URL or a raw sheet ID. The n8n Config node extracts the ID either way,
+  // so parse what was typed and fall back to the default template sheet.
   const payload = { sheetUrl: SHEET_IDS[type] };
 
   if (typedValue) {
-    const customSheetId = parseSheetId(typedValue);
-    if (customSheetId) {
-      payload.sheetUrl = customSheetId;
-    } else if (type === "website") {
-      payload.url = typedValue;
-    } else {
-      payload.keywords = typedValue.split(",").map(k => k.trim()).filter(Boolean);
-    }
+    payload.sheetUrl = parseSheetId(typedValue) || typedValue;
   }
 
   // Location toggle - always send an explicit allLocations flag, and always
@@ -1388,7 +1215,7 @@ async function submitRequest(type) {
   }
 }
 
-renderHome();
+renderConfirm("website");
 </script>
 </body>
 </html>
