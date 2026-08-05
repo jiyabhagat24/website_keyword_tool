@@ -773,16 +773,30 @@
       <div class="step-item">
         <div class="step-number">1</div>
         <div class="step-content">
-          <h3 class="step-title">Make a Copy of the Google Sheet</h3>
-          <p class="step-desc">Pick a tool with the toggle on the left and click <strong>Copy Template Google Sheet</strong>. This opens the template so you can make your own editable copy.</p>
+          <h3 class="step-title">Pick a Tool</h3>
+          <p class="step-desc">Click <strong>Website Tool</strong> or <strong>Keyword Tool</strong> at the top left.</p>
         </div>
       </div>
 
       <div class="step-item">
         <div class="step-number">2</div>
         <div class="step-content">
-          <h3 class="step-title">Locate & Copy your Sheet ID</h3>
-          <p class="step-desc">Look at the browser address bar on your copied sheet. Copy the ID string between <code>/d/</code> and <code>/edit</code>:</p>
+          <h3 class="step-title">Copy the Template Sheet</h3>
+          <p class="step-desc">Click the button below. It opens Google Sheets click <strong>Make a copy</strong>. This is your sheet now, so keep the tab open.</p>
+          <div style="margin-top:12px;">
+            <a class="sheet-link" id="instructions-copy-btn" href="https://docs.google.com/spreadsheets/d/1NEymr4St_ZgL5UUW_h4TGO8xbcy20Bu7V9edCuuIWkU/copy" target="_blank" rel="noopener noreferrer">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              Copy Template Google Sheet
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3 class="step-title">Copy the Sheet's Link</h3>
+          <p class="step-desc">On your copied sheet, click the address bar at the top of your browser and copy the whole link.</p>
 
           <div class="url-guide-box">
             <span class="url-prefix">https://docs.google.com/spreadsheets/d/</span>
@@ -790,23 +804,31 @@
             <span class="url-suffix">/edit#gid=0</span>
           </div>
 
-          <div class="guide-annotation">The highlighted text above is the complete Sheet ID.</div>
-        </div>
-      </div>
-
-      <div class="step-item">
-        <div class="step-number">3</div>
-        <div class="step-content">
-          <h3 class="step-title">Paste Sheet ID or URL & Inputs</h3>
-          <p class="step-desc">Paste the <strong>Sheet ID</strong> (or full URL) into the input box on the left, along with your target Website URL or comma-separated Keywords.</p>
+          <div class="guide-annotation">That's your Sheet ID, highlighted above. No need to trim it — the full link works too.</div>
         </div>
       </div>
 
       <div class="step-item">
         <div class="step-number">4</div>
         <div class="step-content">
-          <h3 class="step-title">Submit & Track Results</h3>
-          <p class="step-desc">Hit <strong>Submit Request</strong>. The workflow runs in the background and populates your Google Sheet in under a minute.</p>
+          <h3 class="step-title">Paste It In</h3>
+          <p class="step-desc">Come back here and paste the link into the <strong>Sheet URL</strong> box on the left.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">5</div>
+        <div class="step-content">
+          <h3 class="step-title">Adjust Options (Optional)</h3>
+          <p class="step-desc"><strong>All Locations</strong> covers India + every state by default. <strong>Custom Date Range</strong> defaults to the last 12 months. Only touch these if you want something different.</p>
+        </div>
+      </div>
+
+      <div class="step-item">
+        <div class="step-number">6</div>
+        <div class="step-content">
+          <h3 class="step-title">Submit</h3>
+          <p class="step-desc">Hit <strong>Submit Request</strong>. Your sheet fills in on its own within a minute.</p>
         </div>
       </div>
     </div>
@@ -915,11 +937,25 @@ function replayEnter() {
   app.classList.add("app-enter");
 }
 
+// Keeps the "Copy Template Google Sheet" button in the instructions
+// card (right column) pointed at whichever tool's template matches
+// the toggle on the left, so it's never one click away from wrong.
+function updateInstructionsSheetLink(type) {
+  const btn = document.getElementById("instructions-copy-btn");
+  if (btn) btn.href = SHEETS[type];
+}
+
 document.getElementById("mode-website").addEventListener("change", (e) => {
-  if (e.target.checked) renderConfirm("website");
+  if (e.target.checked) {
+    renderConfirm("website");
+    updateInstructionsSheetLink("website");
+  }
 });
 document.getElementById("mode-keywords").addEventListener("change", (e) => {
-  if (e.target.checked) renderConfirm("keywords");
+  if (e.target.checked) {
+    renderConfirm("keywords");
+    updateInstructionsSheetLink("keywords");
+  }
 });
 
 function renderConfirm(type) {
@@ -1216,6 +1252,7 @@ async function submitRequest(type) {
 }
 
 renderConfirm("website");
+updateInstructionsSheetLink("website");
 </script>
 </body>
 </html>
