@@ -782,13 +782,7 @@
         <div class="step-number">2</div>
         <div class="step-content">
           <h3 class="step-title">Copy the Template Sheet</h3>
-          <p class="step-desc">Click the button below. It opens Google Sheets click <strong>Make a copy</strong>. This is your sheet now, so keep the tab open.</p>
-          <div style="margin-top:12px;">
-            <a class="sheet-link" id="instructions-copy-btn" href="https://docs.google.com/spreadsheets/d/1NEymr4St_ZgL5UUW_h4TGO8xbcy20Bu7V9edCuuIWkU/copy" target="_blank" rel="noopener noreferrer">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              Copy Template Google Sheet
-            </a>
-          </div>
+          <p class="step-desc">Click <strong>Copy Template Google Sheet</strong> on the left, then click <strong>Make a copy</strong>. This is your sheet now, so keep the tab open.</p>
         </div>
       </div>
 
@@ -954,25 +948,11 @@ function replayEnter() {
   app.classList.add("app-enter");
 }
 
-// Keeps the "Copy Template Google Sheet" button in the instructions
-// card (right column) pointed at whichever tool's template matches
-// the toggle on the left, so it's never one click away from wrong.
-function updateInstructionsSheetLink(type) {
-  const btn = document.getElementById("instructions-copy-btn");
-  if (btn) btn.href = SHEETS[type];
-}
-
 document.getElementById("mode-website").addEventListener("change", (e) => {
-  if (e.target.checked) {
-    renderConfirm("website");
-    updateInstructionsSheetLink("website");
-  }
+  if (e.target.checked) renderConfirm("website");
 });
 document.getElementById("mode-keywords").addEventListener("change", (e) => {
-  if (e.target.checked) {
-    renderConfirm("keywords");
-    updateInstructionsSheetLink("keywords");
-  }
+  if (e.target.checked) renderConfirm("keywords");
 });
 
 function renderConfirm(type) {
@@ -983,17 +963,22 @@ function renderConfirm(type) {
   app.innerHTML = `
     <form onsubmit="return false;">
       <div class="form-group">
+        <label class="field-label-row">
+          Create a copy of this Google Sheet and change access to anyone with the link can edit
+        </label>
+        <div style="display:flex; justify-content:flex-start;">
+          <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            Copy Template Google Sheet
+          </a>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label class="field-label-row" for="tool-input">
           Sheet URL
         </label>
         <input type="text" id="tool-input" placeholder="e.g. https://docs.google.com/spreadsheets/d/1NEymr4St_ZgL5UUW...">
-      </div>
-
-      <div style="display:flex; justify-content:flex-start; margin-top:2px;">
-        <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-          Copy Template Google Sheet
-        </a>
       </div>
 
       <div class="form-group">
@@ -1269,7 +1254,6 @@ async function submitRequest(type) {
 }
 
 renderConfirm("website");
-updateInstructionsSheetLink("website");
 </script>
 </body>
 </html>
