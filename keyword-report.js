@@ -181,6 +181,10 @@ function reportReadLocation(name, rows, getTags) {
     ].includes(label),
   );
   const competitionColumn = columns.indexOf("competition index");
+  const lowBidColumn = columns.findIndex((label) =>
+    ["low big", "low bid"].includes(label),
+  );
+  const highBidColumn = columns.indexOf("high bid");
   if (rows.length && (keywordColumn < 0 || volumeColumn < 0)) {
     throw new Error("Expected Keyword and Search volume columns.");
   }
@@ -215,6 +219,8 @@ function reportReadLocation(name, rows, getTags) {
       keyword,
       volume,
       competition,
+      lowBidMicros: reportReadNumber(row[lowBidColumn]),
+      highBidMicros: reportReadNumber(row[highBidColumn]),
       tier,
       quadrant,
       ...tags,

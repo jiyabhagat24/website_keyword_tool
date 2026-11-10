@@ -1147,3 +1147,24 @@ footer > span:last-child {
     width: 100%;
   }
 }
+.reference-read {
+  background: #fffbf5;
+  border: 1px solid #eee4d8;
+  border-radius: 9px;
+  padding: 18px;
+  margin-bottom: 24px;
+}
+.reference-read h3 {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.reference-read p {
+  color: #5e5a55;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 8px 0 0;
+}
+.success-alert [data-slot="button"] {
+  display: flex;
+  margin-top: 12px;
+}

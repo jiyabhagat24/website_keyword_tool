@@ -226,10 +226,13 @@ function Guide({ report = false }: { report?: boolean }) {
 function Collection({
   sheet,
   setSheet,
+  openReport,
 }: {
   sheet: string;
   setSheet: (value: string) => void;
+  openReport: () => void;
 }) {
+  const [confirmed, setConfirmed] = useState(false);
   const [mode, setMode] = useState<Mode>("website");
   const [all, setAll] = useState(true);
   const [locations, setLocations] = useState<string[]>([]);
@@ -271,6 +274,7 @@ function Collection({
       setState("error");
       return;
     }
+    setConfirmed(false);
     setState("running");
     setError("");
     const controller = new AbortController();
@@ -303,6 +307,12 @@ function Collection({
             ". " +
             text.slice(0, 300),
         );
+      try {
+        const body = JSON.parse(text);
+        setConfirmed(body?.status === "success");
+      } catch {
+        setConfirmed(false);
+      }
       setResponse(text);
       setSheetLink("https://docs.google.com/spreadsheets/d/" + id + "/edit");
       setState("accepted");
@@ -525,12 +535,22 @@ function Collection({
                 <AlertTitle>Collection requested</AlertTitle>
                 <AlertDescription>
                   <p>
-                    The workflow has accepted your request. Open your sheet to
-                    follow the results.
+                    {confirmed
+                      ? "The workflow reported that the location loop finished."
+                      : "The workflow accepted your request. Check your spreadsheet to see when it finishes."}
                   </p>
                   <a href={sheetLink} target="_blank" rel="noopener noreferrer">
                     Open your spreadsheet <ArrowUpRight size={14} />
                   </a>
+                  {confirmed && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={openReport}
+                    >
+                      Open keyword report <ArrowRight />
+                    </Button>
+                  )}
                   {response && (
                     <details>
                       <summary>Workflow response</summary>
@@ -683,6 +703,8 @@ function Reports({
         "Keyword",
         "Search volume",
         "Competition index",
+        "Low bid (micros)",
+        "High bid (micros)",
         "Volume tier",
         "Quadrant",
         "Brand",
@@ -692,6 +714,8 @@ function Reports({
         row.keyword,
         row.volume,
         row.competition,
+        row.lowBidMicros,
+        row.highBidMicros,
         reportTiers[row.tier],
         reportQuadrants[row.quadrant],
         row.brand,
@@ -987,6 +1011,33 @@ function Reports({
               </div>
             </CardHeader>
             <CardContent>
+              <div className="reference-read">
+                <h3>What the numbers show</h3>
+                <p>
+                  In {location.name}, {format(location.keywords.size)} keywords
+                  have reported demand across {format(location.buckets)}{" "}
+                  distinct volume buckets. The highest reported volume is{" "}
+                  {format(location.maxVolume)}. Google rounds these estimates.
+                </p>
+                <p>
+                  {report.brands.length
+                    ? `${format(reportPercent(location.branded, location.keywords.size))}% of keywords match your brand list. `
+                    : "Add brand names when building the report to measure branded keyword share. "}
+                  {reportIntents
+                    .map(
+                      ([name], index) =>
+                        `${name}: ${format(reportPercent(location.intentCounts[index], location.keywords.size))}%`,
+                    )
+                    .join(" · ")}
+                  . Shares are based on keyword counts.
+                </p>
+                <p>
+                  {format(location.quadrants[1])} keywords have high volume and
+                  low advertiser competition. Select that group below to inspect
+                  them. Competition measures advertisers, and bids are
+                  estimates.
+                </p>
+              </div>
               <div className="opportunity-grid">
                 <div>
                   <h3>Competition matrix</h3>
@@ -1111,6 +1162,8 @@ function Reports({
                     "Keyword",
                     "Volume",
                     "Competition",
+                    "Low bid (micros)",
+                    "High bid (micros)",
                     "Tier",
                     "Brand",
                     "Intent",
@@ -1121,6 +1174,8 @@ function Reports({
                       row.keyword,
                       format(row.volume),
                       format(row.competition),
+                      format(row.lowBidMicros),
+                      format(row.highBidMicros),
                       reportTiers[row.tier],
                       row.brand ? (
                         <Badge variant="secondary">{row.brand}</Badge>
@@ -1299,7 +1354,11 @@ export default function App() {
             </div>
           </header>
           <div hidden={workspace !== "collection"}>
-            <Collection sheet={sheet} setSheet={setSheet} />
+            <Collection
+              sheet={sheet}
+              setSheet={setSheet}
+              openReport={() => setWorkspace("report")}
+            />
           </div>
           <div hidden={workspace !== "report"}>
             <Reports sheet={sheet} setSheet={setSheet} />
