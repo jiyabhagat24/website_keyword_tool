@@ -97,14 +97,11 @@ select {
   padding: 0 10px;
 }
 .brand-mark {
-  font-family: "Sora", sans-serif;
-  font-size: 45px;
-  letter-spacing: -4px;
-  font-weight: 800;
-  line-height: 1;
-}
-.brand-mark > span {
-  color: var(--primary);
+  display: block;
+  width: 100%;
+  max-width: 188px;
+  height: auto;
+  object-fit: contain;
 }
 .brand-name {
   font-size: 13px;
@@ -999,14 +996,13 @@ footer > span:last-child {
     padding: 18px 22px 0;
   }
   .brand {
-    flex-direction: row;
-    gap: 15px;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
     padding: 0;
   }
   .brand-mark {
-    font-size: 34px;
-    letter-spacing: -3px;
+    max-width: 158px;
   }
   .brand-name {
     font-size: 11px;
