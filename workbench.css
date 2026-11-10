@@ -1120,3 +1120,57 @@ footer > span:last-child {
     scroll-behavior: auto !important;
   }
 }
+
+.sheet-report-controls {
+  display: grid;
+  gap: 20px;
+}
+.sheet-report-controls > button {
+  justify-self: start;
+}
+.csv-alternative {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.csv-alternative summary {
+  cursor: pointer;
+  color: #805023;
+  font-size: 12px;
+  font-weight: 600;
+}
+.csv-alternative .report-form {
+  margin-top: 20px;
+}
+@media (max-width: 600px) {
+  .sheet-report-controls > button {
+    width: 100%;
+  }
+}
+.reference-read {
+  background: #fffbf5;
+  border: 1px solid #eee4d8;
+  border-radius: 9px;
+  padding: 18px;
+  margin-bottom: 24px;
+}
+.reference-read h3 {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.reference-read p {
+  color: #5e5a55;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 8px 0 0;
+}
+.success-alert [data-slot="button"] {
+  display: flex;
+  margin-top: 12px;
+}
+
+.brand-breakdown, .ai-read { margin: 1.25rem 0; }
+.brand-breakdown table { width: 100%; border-collapse: collapse; }
+.brand-breakdown th, .brand-breakdown td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid rgba(128,128,128,0.25); }
+.ai-item { margin: 0.9rem 0; }
+.ai-item p { margin: 0.25rem 0; }

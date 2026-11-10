@@ -68,8 +68,13 @@ import {
   NativeSelectOption,
 } from "@/components/watermelon/native-select";
 import { WEBHOOKS, SHEETS, LOCATIONS, MONTHS } from "./config";
+import { sheetIdFromInput } from "./google-sheets";
+import { runAnalysisWorkflow, requestStrategicRead } from "./analysis-workflow";
+import type { StrategicRead } from "./analysis-workflow";
 import {
   reportBuild,
+  reportBrandRows,
+  reportFacts,
   reportExportRows,
   reportSafeCsv,
   reportPercent,
@@ -84,6 +89,15 @@ type Mode = "website" | "keywords";
 type Report = ReturnType<typeof reportBuild>;
 const format = (value: number | null) =>
   value === null ? "—" : reportNumber.format(value);
+const formatBid = (micros: number | null) =>
+  micros === null
+    ? "—"
+    : new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(micros / 1_000_000);
 
 function DataTable({
   headers,
@@ -154,12 +168,12 @@ function Guide({ report = false }: { report?: boolean }) {
   const steps = report
     ? [
         [
-          "Export your location tabs",
-          "In Google Sheets, open a location tab and choose File → Download → Comma-separated values (.csv). Repeat for each location.",
+          "Connect your sheet",
+          "Paste the sheet link and enter the access key for your analysis workflow.",
         ],
         [
-          "Include your input tab",
-          "Add Keyword input.csv to measure seed hit rates. For kw: brand seeds, include Website Input.csv.",
+          "Choose brand names",
+          "Add brand names yourself, or enable AI to detect likely brands. AI usage may incur charges.",
         ],
         [
           "Take your findings back",
@@ -177,7 +191,7 @@ function Guide({ report = false }: { report?: boolean }) {
         ],
         [
           "Collect, then compare",
-          "Run the collection. When the location tabs finish filling in, export them as CSV and open Keyword report.",
+          "Run the collection. When the location tabs finish filling in, open Keyword report and connect the same sheet.",
         ],
       ];
   return (
@@ -217,9 +231,17 @@ function Guide({ report = false }: { report?: boolean }) {
   );
 }
 
-function Collection() {
+function Collection({
+  sheet,
+  setSheet,
+  openReport,
+}: {
+  sheet: string;
+  setSheet: (value: string) => void;
+  openReport: () => void;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
   const [mode, setMode] = useState<Mode>("website");
-  const [sheet, setSheet] = useState("");
   const [all, setAll] = useState(true);
   const [locations, setLocations] = useState<string[]>([]);
   const [custom, setCustom] = useState(false);
@@ -260,6 +282,7 @@ function Collection() {
       setState("error");
       return;
     }
+    setConfirmed(false);
     setState("running");
     setError("");
     const controller = new AbortController();
@@ -292,6 +315,12 @@ function Collection() {
             ". " +
             text.slice(0, 300),
         );
+      try {
+        const body = JSON.parse(text);
+        setConfirmed(body?.status === "success");
+      } catch {
+        setConfirmed(false);
+      }
       setResponse(text);
       setSheetLink("https://docs.google.com/spreadsheets/d/" + id + "/edit");
       setState("accepted");
@@ -514,12 +543,22 @@ function Collection() {
                 <AlertTitle>Collection requested</AlertTitle>
                 <AlertDescription>
                   <p>
-                    The workflow has accepted your request. Open your sheet to
-                    follow the results.
+                    {confirmed
+                      ? "The workflow reported that the location loop finished."
+                      : "The workflow accepted your request. Check your spreadsheet to see when it finishes."}
                   </p>
                   <a href={sheetLink} target="_blank" rel="noopener noreferrer">
                     Open your spreadsheet <ArrowUpRight size={14} />
                   </a>
+                  {confirmed && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={openReport}
+                    >
+                      Open keyword report <ArrowRight />
+                    </Button>
+                  )}
                   {response && (
                     <details>
                       <summary>Workflow response</summary>
@@ -555,7 +594,16 @@ function Collection() {
   );
 }
 
-function Reports() {
+function Reports({
+  sheet,
+  setSheet,
+}: {
+  sheet: string;
+  setSheet: (value: string) => void;
+}) {
+  const [accessKey, setAccessKey] = useState("");
+  const [detectBrands, setDetectBrands] = useState(false);
+  const [brandsDetected, setBrandsDetected] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
   const [report, setReport] = useState<Report | null>(null);
@@ -566,6 +614,9 @@ function Reports() {
   const [quadrant, setQuadrant] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [aiRead, setAiRead] = useState<StrategicRead | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
   const location = report?.locations[locationIndex];
   const matching = useMemo(
@@ -585,6 +636,67 @@ function Reports() {
         : [],
     [location, search, quadrant],
   );
+  function applySources(
+    sources: { name: string; text?: string; error?: string }[],
+    brandList = brands,
+  ) {
+    const result = reportBuild(sources, brandList);
+    setMessage(result.errors.join("\n"));
+    if (!result.locations.length) {
+      setMessage(
+        ["No valid location tabs were found.", ...result.errors].join("\n"),
+      );
+      return;
+    }
+    setLocationIndex(0);
+    setQuadrant(null);
+    setSearch("");
+    setPage(0);
+    setAiRead(null);
+    setAiMessage("");
+    setReport(result);
+    requestAnimationFrame(() => resultsRef.current?.focus());
+  }
+  async function writeStrategicRead() {
+    if (!report) return;
+    setAiBusy(true);
+    setAiMessage("");
+    try {
+      setAiRead(await requestStrategicRead(reportFacts(report), accessKey));
+    } catch (error) {
+      setAiMessage(
+        error instanceof Error ? error.message : "The strategic read failed.",
+      );
+    } finally {
+      setAiBusy(false);
+    }
+  }
+  async function buildSheet() {
+    const id = sheetIdFromInput(sheet);
+    if (!id) {
+      setMessage("Paste a valid Google Sheet link or ID.");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    setReport(null);
+    setBrandsDetected(false);
+    try {
+      const result = await runAnalysisWorkflow(id, accessKey, detectBrands);
+      const brandList = [brands.trim(), ...result.brands]
+        .filter(Boolean)
+        .join(", ");
+      setBrands(brandList);
+      setBrandsDetected(result.detected);
+      applySources(result.sources, brandList);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not read the sheet.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   async function build(event: FormEvent) {
     event.preventDefault();
     if (!files.length) {
@@ -609,22 +721,7 @@ function Reports() {
           }
         }),
       );
-      const result = reportBuild(sources, brands);
-      setMessage(result.errors.join("\n"));
-      if (!result.locations.length) {
-        setMessage(
-          ["Choose at least one valid location CSV.", ...result.errors].join(
-            "\n",
-          ),
-        );
-        return;
-      }
-      setLocationIndex(0);
-      setQuadrant(null);
-      setSearch("");
-      setPage(0);
-      setReport(result);
-      requestAnimationFrame(() => resultsRef.current?.focus());
+      applySources(sources);
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -641,6 +738,8 @@ function Reports() {
         "Keyword",
         "Search volume",
         "Competition index",
+        "Low bid (₹)",
+        "High bid (₹)",
         "Volume tier",
         "Quadrant",
         "Brand",
@@ -650,6 +749,8 @@ function Reports() {
         row.keyword,
         row.volume,
         row.competition,
+        row.lowBidMicros === null ? "" : row.lowBidMicros / 1_000_000,
+        row.highBidMicros === null ? "" : row.highBidMicros / 1_000_000,
         reportTiers[row.tier],
         reportQuadrants[row.quadrant],
         row.brand,
@@ -665,110 +766,189 @@ function Reports() {
               <div>
                 <CardTitle>Build your keyword report</CardTitle>
                 <CardDescription>
-                  Bring location exports together in one clear view.
+                  Read your Google Sheet and compare its locations.
                 </CardDescription>
               </div>
-              <Badge variant="outline">CSV import</Badge>
+              <Badge variant="outline">Google Sheets</Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={build} className="report-form">
-              <div
-                className={"upload-area " + (dragging ? "is-dragging" : "")}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  if (!busy) setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setDragging(false);
-                  if (!busy) setFiles([...event.dataTransfer.files]);
-                }}
-              >
-                <div className="upload-icon">
-                  <UploadCloud />
-                </div>
-                <strong>Drop your location CSVs here</strong>
-                <p>Or choose files from your computer</p>
-                <Input
-                  type="file"
-                  id="report-files"
-                  accept=".csv,text/csv"
-                  multiple
-                  disabled={busy}
-                  aria-label="Choose location CSVs"
-                  onChange={(event) =>
-                    setFiles([...(event.target.files ?? [])])
-                  }
-                />
-                <small>
-                  One CSV per location. Include your input tab for seed hit
-                  rates.
-                </small>
-              </div>
-              {files.length > 0 && (
-                <div className="file-list" aria-live="polite">
-                  <span>
-                    {files.length} {files.length === 1 ? "file" : "files"}{" "}
-                    selected
-                  </span>
-                  {files.map((file, i) => (
-                    <Badge key={i} variant="secondary">
-                      <FileSpreadsheet size={12} />
-                      <span title={file.name}>{file.name}</span>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        aria-label={"Remove " + file.name}
-                        onClick={() =>
-                          setFiles((previous) =>
-                            previous.filter((_, index) => index !== i),
-                          )
-                        }
-                      >
-                        <X size={12} />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
+            <div className="sheet-report-controls">
               <div className="field">
-                <Label htmlFor="report-brands">
+                <Label htmlFor="report-sheet">Google Sheet link or ID</Label>
+                <Input
+                  id="report-sheet"
+                  value={sheet}
+                  onChange={(event) => setSheet(event.target.value)}
+                  placeholder="Paste your spreadsheet link or ID"
+                  disabled={busy}
+                />
+                <p>
+                  The analysis workflow reads this sheet using its connected
+                  Google account.
+                </p>
+              </div>
+              <div className="field">
+                <Label htmlFor="report-access">Analysis access key</Label>
+                <Input
+                  id="report-access"
+                  type="password"
+                  autoComplete="off"
+                  value={accessKey}
+                  onChange={(event) => setAccessKey(event.target.value)}
+                  disabled={busy}
+                  placeholder="Enter your n8n access key"
+                />
+                <p>Ask your workflow administrator for this key.</p>
+              </div>
+              <div className="setting-row">
+                <Sparkles />
+                <div>
+                  <Label htmlFor="detect-brands">Detect brands with AI</Label>
+                  <p>
+                    Optional. Sends keywords to OpenAI and may use paid API
+                    credits. Maximum 5,000 keywords per run.
+                  </p>
+                </div>
+                <Switch
+                  id="detect-brands"
+                  checked={detectBrands}
+                  onCheckedChange={setDetectBrands}
+                  disabled={busy}
+                />
+              </div>
+              <div className="field">
+                <Label htmlFor="sheet-brands">
                   Brands to match <span>Optional</span>
                 </Label>
                 <Input
-                  id="report-brands"
+                  id="sheet-brands"
                   value={brands}
                   disabled={busy}
                   onChange={(event) => setBrands(event.target.value)}
                   placeholder="Philips, Agaro, Prestige"
                   maxLength={4000}
                 />
-                <p>
-                  Separate names with commas to distinguish branded and generic
-                  keywords.
-                </p>
+                {brandsDetected && (
+                  <p>
+                    Review the detected names. Edit the list and turn off AI
+                    detection before rebuilding to use your corrections.
+                  </p>
+                )}
               </div>
-              <div className="form-bottom">
-                <span>
-                  <LockKeyhole />
-                  Files stay on your device
-                </span>
-                <Button type="submit" disabled={busy}>
-                  {busy ? (
-                    <>
-                      <Loader2 className="spinner" />
-                      Reading files
-                    </>
-                  ) : (
-                    <>
-                      Build report <ArrowRight />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
+              <Button type="button" onClick={buildSheet} disabled={busy}>
+                {busy ? (
+                  <>
+                    <Loader2 className="spinner" />
+                    Reading sheet
+                  </>
+                ) : (
+                  <>
+                    Build report from sheet <ArrowRight />
+                  </>
+                )}
+              </Button>
+            </div>
+            <details className="csv-alternative">
+              <summary>Or import CSV files</summary>
+              <form onSubmit={build} className="report-form">
+                <div
+                  className={"upload-area " + (dragging ? "is-dragging" : "")}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    if (!busy) setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragging(false);
+                    if (!busy) setFiles([...event.dataTransfer.files]);
+                  }}
+                >
+                  <div className="upload-icon">
+                    <UploadCloud />
+                  </div>
+                  <strong>Drop your location CSVs here</strong>
+                  <p>Or choose files from your computer</p>
+                  <Input
+                    type="file"
+                    id="report-files"
+                    accept=".csv,text/csv"
+                    multiple
+                    disabled={busy}
+                    aria-label="Choose location CSVs"
+                    onChange={(event) =>
+                      setFiles([...(event.target.files ?? [])])
+                    }
+                  />
+                  <small>
+                    One CSV per location. Include your input tab for seed hit
+                    rates.
+                  </small>
+                </div>
+                {files.length > 0 && (
+                  <div className="file-list" aria-live="polite">
+                    <span>
+                      {files.length} {files.length === 1 ? "file" : "files"}{" "}
+                      selected
+                    </span>
+                    {files.map((file, i) => (
+                      <Badge key={i} variant="secondary">
+                        <FileSpreadsheet size={12} />
+                        <span title={file.name}>{file.name}</span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          aria-label={"Remove " + file.name}
+                          onClick={() =>
+                            setFiles((previous) =>
+                              previous.filter((_, index) => index !== i),
+                            )
+                          }
+                        >
+                          <X size={12} />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="field">
+                  <Label htmlFor="report-brands">
+                    Brands to match <span>Optional</span>
+                  </Label>
+                  <Input
+                    id="report-brands"
+                    value={brands}
+                    disabled={busy}
+                    onChange={(event) => setBrands(event.target.value)}
+                    placeholder="Philips, Agaro, Prestige"
+                    maxLength={4000}
+                  />
+                  <p>
+                    Separate names with commas to distinguish branded and
+                    generic keywords.
+                  </p>
+                </div>
+                <div className="form-bottom">
+                  <span>
+                    <LockKeyhole />
+                    Files stay on your device
+                  </span>
+                  <Button type="submit" disabled={busy}>
+                    {busy ? (
+                      <>
+                        <Loader2 className="spinner" />
+                        Reading files
+                      </>
+                    ) : (
+                      <>
+                        Build report <ArrowRight />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </details>
           </CardContent>
         </Card>
         <Guide report />
@@ -904,6 +1084,123 @@ function Reports() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="reference-read">
+                <h3>What the numbers show</h3>
+                <p>
+                  In {location.name}, {format(location.keywords.size)} keywords
+                  have reported demand across {format(location.buckets)}{" "}
+                  distinct volume buckets. The highest reported volume is{" "}
+                  {format(location.maxVolume)}. Google rounds these estimates.
+                </p>
+                <p>
+                  {report.brands.length
+                    ? `${format(reportPercent(location.branded, location.keywords.size))}% of keywords match your brand list. `
+                    : "Add brand names when building the report to measure branded keyword share. "}
+                  {reportIntents
+                    .map(
+                      ([name], index) =>
+                        `${name}: ${format(reportPercent(location.intentCounts[index], location.keywords.size))}%`,
+                    )
+                    .join(" · ")}
+                  . Shares are based on keyword counts.
+                </p>
+                <p>
+                  {format(location.quadrants[1])} keywords have high volume and
+                  low advertiser competition. Select that group below to inspect
+                  them. Competition measures advertisers, and bids are
+                  estimates.
+                </p>
+              </div>
+              {report.brands.length > 0 && (
+                <div className="brand-breakdown">
+                  <h3>Brands in {location.name}</h3>
+                  {reportBrandRows(location).length ? (
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Brand</th>
+                          <th>Keywords</th>
+                          <th>Indicative volume</th>
+                          <th>Share of branded volume</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportBrandRows(location)
+                          .slice(0, 15)
+                          .map((row) => (
+                            <tr key={row.brand}>
+                              <td>{row.brand}</td>
+                              <td>{format(row.keywords)}</td>
+                              <td>{format(row.volume)}</td>
+                              <td>{format(row.share)}%</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="helper">
+                      No brand from your list appears in this location.
+                    </p>
+                  )}
+                  <p className="helper">
+                    Volumes add up Google’s rounded values for each brand’s
+                    keywords, so treat them as a guide, not an exact figure.
+                    {report.absentBrands.length > 0 &&
+                      " Not found in any location: " +
+                        report.absentBrands.join(", ") +
+                        "."}
+                  </p>
+                </div>
+              )}
+              <div className="ai-read">
+                <h3>Strategic read (AI)</h3>
+                <p className="helper">
+                  Sends only the calculated summary above, not your keywords, to
+                  OpenAI. It may incur API charges. The result is a set of
+                  hypotheses, not facts from the data.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={aiBusy}
+                  onClick={writeStrategicRead}
+                >
+                  {aiBusy
+                    ? "Writing…"
+                    : aiRead
+                      ? "Write again"
+                      : "Write strategic read"}
+                </Button>
+                {aiMessage && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{aiMessage}</AlertDescription>
+                  </Alert>
+                )}
+                {aiRead && (
+                  <div>
+                    {aiRead.items.map((item, index) => (
+                      <div key={index} className="ai-item">
+                        <strong>{item.section}</strong>
+                        <p>{item.observation}</p>
+                        <p>
+                          <em>Hypothesis (AI):</em> {item.hypothesis}
+                        </p>
+                      </div>
+                    ))}
+                    {aiRead.caveats.length > 0 && (
+                      <ul>
+                        {aiRead.caveats.map((caveat, index) => (
+                          <li key={index}>{caveat}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="helper">
+                      Written by {aiRead.model}. Check every number against the
+                      tables before using it in a client document.
+                    </p>
+                  </div>
+                )}
+              </div>
               <div className="opportunity-grid">
                 <div>
                   <h3>Competition matrix</h3>
@@ -1028,6 +1325,8 @@ function Reports() {
                     "Keyword",
                     "Volume",
                     "Competition",
+                    "Low bid (₹)",
+                    "High bid (₹)",
                     "Tier",
                     "Brand",
                     "Intent",
@@ -1038,6 +1337,8 @@ function Reports() {
                       row.keyword,
                       format(row.volume),
                       format(row.competition),
+                      formatBid(row.lowBidMicros),
+                      formatBid(row.highBidMicros),
                       reportTiers[row.tier],
                       row.brand ? (
                         <Badge variant="secondary">{row.brand}</Badge>
@@ -1119,6 +1420,7 @@ function Reports() {
 }
 
 export default function App() {
+  const [sheet, setSheet] = useState("");
   const [workspace, setWorkspace] = useState<"collection" | "report">(
     "collection",
   );
@@ -1215,10 +1517,14 @@ export default function App() {
             </div>
           </header>
           <div hidden={workspace !== "collection"}>
-            <Collection />
+            <Collection
+              sheet={sheet}
+              setSheet={setSheet}
+              openReport={() => setWorkspace("report")}
+            />
           </div>
           <div hidden={workspace !== "report"}>
-            <Reports />
+            <Reports sheet={sheet} setSheet={setSheet} />
           </div>
           <footer>
             <span>The Bored Monkey · Keyword Workbench</span>

@@ -181,6 +181,10 @@ function reportReadLocation(name, rows, getTags) {
     ].includes(label),
   );
   const competitionColumn = columns.indexOf("competition index");
+  const lowBidColumn = columns.findIndex((label) =>
+    ["low big", "low bid"].includes(label),
+  );
+  const highBidColumn = columns.indexOf("high bid");
   if (rows.length && (keywordColumn < 0 || volumeColumn < 0)) {
     throw new Error("Expected Keyword and Search volume columns.");
   }
@@ -201,6 +205,8 @@ function reportReadLocation(name, rows, getTags) {
   let maxVolume = null;
   let branded = 0;
   const intentCounts = reportIntents.map(() => 0);
+  /** @type {Map<string, {keywords: number, volume: number}>} */
+  const brandStats = new Map();
   for (const row of records) {
     const keyword = (row[keywordColumn] ?? "").trim();
     const key = reportNormalize(keyword);
@@ -215,6 +221,8 @@ function reportReadLocation(name, rows, getTags) {
       keyword,
       volume,
       competition,
+      lowBidMicros: reportReadNumber(row[lowBidColumn]),
+      highBidMicros: reportReadNumber(row[highBidColumn]),
       tier,
       quadrant,
       ...tags,
@@ -223,7 +231,13 @@ function reportReadLocation(name, rows, getTags) {
     quadrants[quadrant]++;
     buckets.add(volume);
     maxVolume = Math.max(maxVolume ?? 0, volume);
-    if (tags.brand === "Branded") branded++;
+    if (tags.brand === "Branded") {
+      branded++;
+      const stat = brandStats.get(tags.brandName) ?? { keywords: 0, volume: 0 };
+      stat.keywords++;
+      stat.volume += volume;
+      brandStats.set(tags.brandName, stat);
+    }
     for (const intent of tags.intents) intentCounts[intent]++;
     const baseVolume = reportReadNumber(row[baseline?.index]);
     if (!baseVolume) continue;
@@ -261,6 +275,7 @@ function reportReadLocation(name, rows, getTags) {
     seasonality,
     seasonNote,
     branded,
+    brandStats,
     intentCounts,
   };
 }
@@ -275,7 +290,7 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
   ];
   const brandPattern = brands.length
     ? new RegExp(
-        "(?:^|[^\\p{L}\\p{N}])(?:" +
+        "(?:^|[^\\p{L}\\p{N}])(" +
           brands
             .map((brand) => brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
             .join("|") +
@@ -286,12 +301,10 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
   const tagsByKeyword = new Map();
   function getTags(keyword) {
     if (!tagsByKeyword.has(keyword)) {
+      const hit = brandPattern ? brandPattern.exec(keyword) : null;
       tagsByKeyword.set(keyword, {
-        brand: brandPattern
-          ? brandPattern.test(keyword)
-            ? "Branded"
-            : "Generic"
-          : "",
+        brand: brandPattern ? (hit ? "Branded" : "Generic") : "",
+        brandName: hit ? hit[1] : "",
         intents: reportIntents.flatMap(([, rule], index) =>
           rule.test(keyword) ? [index] : [],
         ),
@@ -369,16 +382,108 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
       right.keywords.size - left.keywords.size ||
       left.name.localeCompare(right.name),
   );
+  const seenBrands = new Set(
+    locations.flatMap((location) => [...location.brandStats.keys()]),
+  );
   return {
     locations,
     errors,
     unique: tagsByKeyword.size,
     brands,
+    absentBrands: brands.filter((brand) => !seenBrands.has(brand)),
     seedCount: selectedSeeds.size,
     seedHits: seedHits.size,
     seedSource: websiteSeeds.size
       ? "Website Input kw: entries"
       : "Keyword input",
+  };
+}
+
+/**
+ * Brands in one location, largest first. Volumes are sums of Google's rounded
+ * values for that brand's keywords, so they are indicative, not exact.
+ */
+function reportBrandRows(location) {
+  const total = [...location.brandStats.values()].reduce(
+    (sum, stat) => sum + stat.volume,
+    0,
+  );
+  return [...location.brandStats.entries()]
+    .map(([brand, stat]) => ({
+      brand,
+      keywords: stat.keywords,
+      volume: stat.volume,
+      share: reportPercent(stat.volume, total),
+    }))
+    .sort((a, b) => b.volume - a.volume || a.brand.localeCompare(b.brand));
+}
+
+/** Compact, calculated facts for the AI strategic read. No raw keywords. */
+function reportFacts(report) {
+  const round = (value) =>
+    value === null || value === undefined ? null : Number(value.toFixed(1));
+  const home =
+    report.locations.find((l) => reportNormalize(l.name) === "india") ??
+    report.locations[0];
+  const shares = (location) => ({
+    brandedPct: report.brands.length
+      ? round(reportPercent(location.branded, location.keywords.size))
+      : null,
+    ...Object.fromEntries(
+      reportIntents.map(([name], index) => [
+        name.toLowerCase() + "Pct",
+        round(
+          reportPercent(location.intentCounts[index], location.keywords.size),
+        ),
+      ]),
+    ),
+  });
+  return {
+    note: "Search volumes are rounded by Google into buckets. Percentages use keyword counts. Brand volumes are sums of rounded values and only indicative.",
+    totals: {
+      locations: report.locations.length,
+      distinctKeywordsWithDemand: report.unique,
+      seeds: report.seedCount,
+      seedsWithDemand: report.seedHits,
+    },
+    national: home && {
+      name: home.name,
+      keywordsWithDemand: home.keywords.size,
+      distinctVolumeBuckets: home.buckets,
+      peakVolume: home.maxVolume,
+      volumeTiers: Object.fromEntries(
+        reportTiers.map((name, i) => [name, home.tiers[i]]),
+      ),
+      competitionGroups: Object.fromEntries(
+        reportQuadrants.map((name, i) => [name, home.quadrants[i]]),
+      ),
+      ...shares(home),
+      topBrands: reportBrandRows(home)
+        .slice(0, 10)
+        .map(({ brand, keywords, volume }) => ({ brand, keywords, volume })),
+      seasonality: home.seasonality
+        .filter((m) => m.index !== null)
+        .map((m) => ({ month: m.label, index: round(m.index) })),
+      seasonalityNote: home.seasonNote,
+    },
+    topLocations: report.locations.slice(0, 12).map((location) => ({
+      name: location.name,
+      keywordsWithDemand: location.keywords.size,
+      peakVolume: location.maxVolume,
+      ...shares(location),
+      topBrand: reportBrandRows(location)[0]?.brand ?? null,
+    })),
+    locationsWithNoOrOneKeyword: report.locations
+      .filter((location) => location.keywords.size <= 1)
+      .map((location) => location.name),
+    cityVersusState: report.locations
+      .filter((location) => location.cityState)
+      .map((location) => ({
+        city: location.name,
+        state: location.cityState.name,
+        medianCityToStateVolumePct: round(location.cityState.index),
+      })),
+    brandsNotFoundInAnyLocation: report.absentBrands,
   };
 }
 
@@ -466,6 +571,30 @@ function reportExportRows(report) {
         fmt(location.cityState.index),
         location.cityState.pairs,
       ]),
+    ...(report.brands.length
+      ? [
+          [],
+          [
+            "Brand",
+            "Location",
+            "Keywords",
+            "Indicative volume",
+            "Share of branded volume (%)",
+          ],
+          ...report.locations.flatMap((location) =>
+            reportBrandRows(location).map((row) => [
+              row.brand,
+              location.name,
+              row.keywords,
+              row.volume,
+              fmt(row.share),
+            ]),
+          ),
+          [],
+          ["Brands not found in any location"],
+          ...report.absentBrands.map((brand) => [brand]),
+        ]
+      : []),
     [],
     [
       "Location",
@@ -490,6 +619,8 @@ function reportExportRows(report) {
 
 export {
   reportBuild,
+  reportBrandRows,
+  reportFacts,
   reportExportRows,
   reportSafeCsv,
   reportPercent,
