@@ -18,15 +18,16 @@ Component provenance and license are in `src/components/watermelon/`. The interf
 2. Give the Google account used by the automation Editor access to your copy. Add your input in the matching input tab.
 3. Paste your spreadsheet link or ID into the workbench, choose locations or dates if needed, and submit. The workflow writes results to the spreadsheet.
 
-## Connect Google Sheets
+## Connect the n8n analysis workflow
 
-1. Create or select a Google Cloud project and enable the Google Sheets API.
-2. Configure the OAuth consent screen and create an OAuth client ID of type **Web application**. Add the exact website origin under **Authorized JavaScript origins**. For local development, include the exact Vite origin, such as `http://localhost:5173`.
-3. If the OAuth app is in testing mode, add the Google accounts that will sign in as test users.
-4. Set `VITE_GOOGLE_CLIENT_ID` to the public web client ID in your hosting service's build settings and rebuild. For local development, set it in a gitignored `.env.local` file. Keep client secrets out of the browser and repository.
-5. In **Keyword report**, paste the sheet link and choose **Connect Google Sheet**. Sign in with an account that can view it and grant read-only access. Recognized location tabs and input tabs are loaded. Use CSV import for custom location names.
+1. Import `workflows/Keyword Report - n8n Analysis.json` as a new n8n workflow. It is inactive when imported.
+2. In **Analysis Webhook**, create or choose a Header Auth credential with header name `X-Report-Key` and a strong value. Share that value only with people who may run reports. Replace `https://YOUR-WEBSITE-ORIGIN` in the webhook's allowed origins with the exact origin of your website.
+3. Connect the existing Google Sheets OAuth credential to **List Sheet Tabs** and **Read Sheet Tabs**. That Google account needs access to the copied spreadsheet.
+4. To use optional brand detection, connect the existing Google Gemini(PaLM) API credential to **Gemini Detect Brands**. Brand detection sends keywords to Gemini and can incur API charges. The workflow allows up to 5,000 distinct keywords when it is enabled. It uses `gemini-2.5-flash-lite`, which can be changed in that node.
+5. Publish the workflow. Set `VITE_ANALYSIS_WEBHOOK_URL` in your hosting service to the production HTTPS webhook URL and rebuild the website. For local development, place that variable in the gitignored `.env.local` file.
+6. The user pastes the copied spreadsheet link into **Collect data**. After the workflow reports completion, **Open keyword report** carries that link to the report. Enter the analysis access key and select **Build report from sheet**. Gemini brand detection is optional and off by default. Review suggested brands before using them for decisions.
 
-Google sign-in requires an authorized HTTP or HTTPS origin. See [Google Identity Services setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid).
+The workflow reads the standard location and input tabs. Use CSV import for custom location names. The analysis runs after the user starts it and the n8n webhook responds; large sheets and paid brand detection can hit execution, response-size, rate, or proxy timeout limits. Check the n8n execution before retrying after a timeout. The live n8n workflow and its completion behavior must be tested in your instance before relying on automatic handoff.
 
 ## Build a keyword report from CSV
 

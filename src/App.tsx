@@ -1,7 +1,6 @@
 import tbmLogo from "./assets/tbm-logo.png";
 import {
   useMemo,
-  useEffect,
   useRef,
   useState,
   type FormEvent,
@@ -69,11 +68,8 @@ import {
   NativeSelectOption,
 } from "@/components/watermelon/native-select";
 import { WEBHOOKS, SHEETS, LOCATIONS, MONTHS } from "./config";
-import {
-  loadGoogleIdentity,
-  readGoogleSheet,
-  sheetIdFromInput,
-} from "./google-sheets";
+import { sheetIdFromInput } from "./google-sheets";
+import { runAnalysisWorkflow } from "./analysis-workflow";
 import {
   reportBuild,
   reportExportRows,
@@ -90,7 +86,15 @@ type Mode = "website" | "keywords";
 type Report = ReturnType<typeof reportBuild>;
 const format = (value: number | null) =>
   value === null ? "—" : reportNumber.format(value);
-const formatBid = (micros: number | null) => micros === null ? "—" : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(micros / 1_000_000);
+const formatBid = (micros: number | null) =>
+  micros === null
+    ? "—"
+    : new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(micros / 1_000_000);
 
 function DataTable({
   headers,
@@ -162,11 +166,11 @@ function Guide({ report = false }: { report?: boolean }) {
     ? [
         [
           "Connect your sheet",
-          "Paste the sheet link and sign in with a Google account that has access.",
+          "Paste the sheet link and enter the access key for your analysis workflow.",
         ],
         [
           "Choose brand names",
-          "Optionally add your brand names to match branded keywords. Your input tabs are included in seed hit rates.",
+          "Add brand names yourself, or enable Gemini to detect likely brands. AI usage may incur charges.",
         ],
         [
           "Take your findings back",
@@ -594,9 +598,9 @@ function Reports({
   sheet: string;
   setSheet: (value: string) => void;
 }) {
-  useEffect(() => {
-    void loadGoogleIdentity().catch(() => {});
-  }, []);
+  const [accessKey, setAccessKey] = useState("");
+  const [detectBrands, setDetectBrands] = useState(false);
+  const [brandsDetected, setBrandsDetected] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
   const [report, setReport] = useState<Report | null>(null);
@@ -628,8 +632,9 @@ function Reports({
   );
   function applySources(
     sources: { name: string; text?: string; error?: string }[],
+    brandList = brands,
   ) {
-    const result = reportBuild(sources, brands);
+    const result = reportBuild(sources, brandList);
     setMessage(result.errors.join("\n"));
     if (!result.locations.length) {
       setMessage(
@@ -653,8 +658,15 @@ function Reports({
     setBusy(true);
     setMessage("");
     setReport(null);
+    setBrandsDetected(false);
     try {
-      applySources(await readGoogleSheet(id));
+      const result = await runAnalysisWorkflow(id, accessKey, detectBrands);
+      const brandList = [brands.trim(), ...result.brands]
+        .filter(Boolean)
+        .join(", ");
+      setBrands(brandList);
+      setBrandsDetected(result.detected);
+      applySources(result.sources, brandList);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Could not read the sheet.",
@@ -749,7 +761,41 @@ function Reports({
                   placeholder="Paste your spreadsheet link or ID"
                   disabled={busy}
                 />
-                <p>Sign in with a Google account that can view this sheet.</p>
+                <p>
+                  The analysis workflow reads this sheet using its connected
+                  Google account.
+                </p>
+              </div>
+              <div className="field">
+                <Label htmlFor="report-access">Analysis access key</Label>
+                <Input
+                  id="report-access"
+                  type="password"
+                  autoComplete="off"
+                  value={accessKey}
+                  onChange={(event) => setAccessKey(event.target.value)}
+                  disabled={busy}
+                  placeholder="Enter your n8n access key"
+                />
+                <p>Ask your workflow administrator for this key.</p>
+              </div>
+              <div className="setting-row">
+                <Sparkles />
+                <div>
+                  <Label htmlFor="detect-brands">
+                    Detect brands with Gemini
+                  </Label>
+                  <p>
+                    Optional. Sends keywords to Gemini and may use paid API
+                    credits. Maximum 5,000 keywords per run.
+                  </p>
+                </div>
+                <Switch
+                  id="detect-brands"
+                  checked={detectBrands}
+                  onCheckedChange={setDetectBrands}
+                  disabled={busy}
+                />
               </div>
               <div className="field">
                 <Label htmlFor="sheet-brands">
@@ -763,6 +809,12 @@ function Reports({
                   placeholder="Philips, Agaro, Prestige"
                   maxLength={4000}
                 />
+                {brandsDetected && (
+                  <p>
+                    Review the detected names. Edit the list and turn off Gemini
+                    before rebuilding to use your corrections.
+                  </p>
+                )}
               </div>
               <Button type="button" onClick={buildSheet} disabled={busy}>
                 {busy ? (
@@ -772,7 +824,7 @@ function Reports({
                   </>
                 ) : (
                   <>
-                    Connect Google Sheet <ArrowRight />
+                    Build report from sheet <ArrowRight />
                   </>
                 )}
               </Button>
