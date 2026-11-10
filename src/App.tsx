@@ -90,6 +90,7 @@ type Mode = "website" | "keywords";
 type Report = ReturnType<typeof reportBuild>;
 const format = (value: number | null) =>
   value === null ? "—" : reportNumber.format(value);
+const formatBid = (micros: number | null) => micros === null ? "—" : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(micros / 1_000_000);
 
 function DataTable({
   headers,
@@ -703,8 +704,8 @@ function Reports({
         "Keyword",
         "Search volume",
         "Competition index",
-        "Low bid (micros)",
-        "High bid (micros)",
+        "Low bid (₹)",
+        "High bid (₹)",
         "Volume tier",
         "Quadrant",
         "Brand",
@@ -714,8 +715,8 @@ function Reports({
         row.keyword,
         row.volume,
         row.competition,
-        row.lowBidMicros,
-        row.highBidMicros,
+        row.lowBidMicros === null ? "" : row.lowBidMicros / 1_000_000,
+        row.highBidMicros === null ? "" : row.highBidMicros / 1_000_000,
         reportTiers[row.tier],
         reportQuadrants[row.quadrant],
         row.brand,
@@ -1162,8 +1163,8 @@ function Reports({
                     "Keyword",
                     "Volume",
                     "Competition",
-                    "Low bid (micros)",
-                    "High bid (micros)",
+                    "Low bid (₹)",
+                    "High bid (₹)",
                     "Tier",
                     "Brand",
                     "Intent",
@@ -1174,8 +1175,8 @@ function Reports({
                       row.keyword,
                       format(row.volume),
                       format(row.competition),
-                      format(row.lowBidMicros),
-                      format(row.highBidMicros),
+                      formatBid(row.lowBidMicros),
+                      formatBid(row.highBidMicros),
                       reportTiers[row.tier],
                       row.brand ? (
                         <Badge variant="secondary">{row.brand}</Badge>
