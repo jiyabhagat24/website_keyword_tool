@@ -1,3 +1,4 @@
+import tbmLogo from "./assets/tbm-logo.png";
 import {
   useMemo,
   useRef,
@@ -1132,11 +1133,9 @@ export default function App() {
           href="./"
           aria-label="The Bored Monkey Keyword Workbench"
         >
-          <span className="brand-mark">
-            tbm<span>.</span>
-          </span>
+          <img className="brand-mark" src={tbmLogo} alt="" />
           <span className="brand-name">
-            the bored monkey<span>Keyword Workbench</span>
+            TheBoredMonkey<span>Keyword Workbench</span>
           </span>
         </a>
         <div className="sidebar-label">Research workspace</div>
