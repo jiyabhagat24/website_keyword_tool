@@ -1,6 +1,7 @@
 import tbmLogo from "./assets/tbm-logo.png";
 import {
   useMemo,
+  useEffect,
   useRef,
   useState,
   type FormEvent,
@@ -68,6 +69,11 @@ import {
   NativeSelectOption,
 } from "@/components/watermelon/native-select";
 import { WEBHOOKS, SHEETS, LOCATIONS, MONTHS } from "./config";
+import {
+  loadGoogleIdentity,
+  readGoogleSheet,
+  sheetIdFromInput,
+} from "./google-sheets";
 import {
   reportBuild,
   reportExportRows,
@@ -154,12 +160,12 @@ function Guide({ report = false }: { report?: boolean }) {
   const steps = report
     ? [
         [
-          "Export your location tabs",
-          "In Google Sheets, open a location tab and choose File → Download → Comma-separated values (.csv). Repeat for each location.",
+          "Connect your sheet",
+          "Paste the sheet link and sign in with a Google account that has access.",
         ],
         [
-          "Include your input tab",
-          "Add Keyword input.csv to measure seed hit rates. For kw: brand seeds, include Website Input.csv.",
+          "Choose brand names",
+          "Optionally add your brand names to match branded keywords. Your input tabs are included in seed hit rates.",
         ],
         [
           "Take your findings back",
@@ -177,7 +183,7 @@ function Guide({ report = false }: { report?: boolean }) {
         ],
         [
           "Collect, then compare",
-          "Run the collection. When the location tabs finish filling in, export them as CSV and open Keyword report.",
+          "Run the collection. When the location tabs finish filling in, open Keyword report and connect the same sheet.",
         ],
       ];
   return (
@@ -217,9 +223,14 @@ function Guide({ report = false }: { report?: boolean }) {
   );
 }
 
-function Collection() {
+function Collection({
+  sheet,
+  setSheet,
+}: {
+  sheet: string;
+  setSheet: (value: string) => void;
+}) {
   const [mode, setMode] = useState<Mode>("website");
-  const [sheet, setSheet] = useState("");
   const [all, setAll] = useState(true);
   const [locations, setLocations] = useState<string[]>([]);
   const [custom, setCustom] = useState(false);
@@ -555,7 +566,16 @@ function Collection() {
   );
 }
 
-function Reports() {
+function Reports({
+  sheet,
+  setSheet,
+}: {
+  sheet: string;
+  setSheet: (value: string) => void;
+}) {
+  useEffect(() => {
+    void loadGoogleIdentity().catch(() => {});
+  }, []);
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
   const [report, setReport] = useState<Report | null>(null);
@@ -585,6 +605,43 @@ function Reports() {
         : [],
     [location, search, quadrant],
   );
+  function applySources(
+    sources: { name: string; text?: string; error?: string }[],
+  ) {
+    const result = reportBuild(sources, brands);
+    setMessage(result.errors.join("\n"));
+    if (!result.locations.length) {
+      setMessage(
+        ["No valid location tabs were found.", ...result.errors].join("\n"),
+      );
+      return;
+    }
+    setLocationIndex(0);
+    setQuadrant(null);
+    setSearch("");
+    setPage(0);
+    setReport(result);
+    requestAnimationFrame(() => resultsRef.current?.focus());
+  }
+  async function buildSheet() {
+    const id = sheetIdFromInput(sheet);
+    if (!id) {
+      setMessage("Paste a valid Google Sheet link or ID.");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    setReport(null);
+    try {
+      applySources(await readGoogleSheet(id));
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not read the sheet.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   async function build(event: FormEvent) {
     event.preventDefault();
     if (!files.length) {
@@ -609,22 +666,7 @@ function Reports() {
           }
         }),
       );
-      const result = reportBuild(sources, brands);
-      setMessage(result.errors.join("\n"));
-      if (!result.locations.length) {
-        setMessage(
-          ["Choose at least one valid location CSV.", ...result.errors].join(
-            "\n",
-          ),
-        );
-        return;
-      }
-      setLocationIndex(0);
-      setQuadrant(null);
-      setSearch("");
-      setPage(0);
-      setReport(result);
-      requestAnimationFrame(() => resultsRef.current?.focus());
+      applySources(sources);
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -665,110 +707,151 @@ function Reports() {
               <div>
                 <CardTitle>Build your keyword report</CardTitle>
                 <CardDescription>
-                  Bring location exports together in one clear view.
+                  Read your Google Sheet and compare its locations.
                 </CardDescription>
               </div>
-              <Badge variant="outline">CSV import</Badge>
+              <Badge variant="outline">Google Sheets</Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={build} className="report-form">
-              <div
-                className={"upload-area " + (dragging ? "is-dragging" : "")}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  if (!busy) setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setDragging(false);
-                  if (!busy) setFiles([...event.dataTransfer.files]);
-                }}
-              >
-                <div className="upload-icon">
-                  <UploadCloud />
-                </div>
-                <strong>Drop your location CSVs here</strong>
-                <p>Or choose files from your computer</p>
-                <Input
-                  type="file"
-                  id="report-files"
-                  accept=".csv,text/csv"
-                  multiple
-                  disabled={busy}
-                  aria-label="Choose location CSVs"
-                  onChange={(event) =>
-                    setFiles([...(event.target.files ?? [])])
-                  }
-                />
-                <small>
-                  One CSV per location. Include your input tab for seed hit
-                  rates.
-                </small>
-              </div>
-              {files.length > 0 && (
-                <div className="file-list" aria-live="polite">
-                  <span>
-                    {files.length} {files.length === 1 ? "file" : "files"}{" "}
-                    selected
-                  </span>
-                  {files.map((file, i) => (
-                    <Badge key={i} variant="secondary">
-                      <FileSpreadsheet size={12} />
-                      <span title={file.name}>{file.name}</span>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        aria-label={"Remove " + file.name}
-                        onClick={() =>
-                          setFiles((previous) =>
-                            previous.filter((_, index) => index !== i),
-                          )
-                        }
-                      >
-                        <X size={12} />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
+            <div className="sheet-report-controls">
               <div className="field">
-                <Label htmlFor="report-brands">
+                <Label htmlFor="report-sheet">Google Sheet link or ID</Label>
+                <Input
+                  id="report-sheet"
+                  value={sheet}
+                  onChange={(event) => setSheet(event.target.value)}
+                  placeholder="Paste your spreadsheet link or ID"
+                  disabled={busy}
+                />
+                <p>Sign in with a Google account that can view this sheet.</p>
+              </div>
+              <div className="field">
+                <Label htmlFor="sheet-brands">
                   Brands to match <span>Optional</span>
                 </Label>
                 <Input
-                  id="report-brands"
+                  id="sheet-brands"
                   value={brands}
                   disabled={busy}
                   onChange={(event) => setBrands(event.target.value)}
                   placeholder="Philips, Agaro, Prestige"
                   maxLength={4000}
                 />
-                <p>
-                  Separate names with commas to distinguish branded and generic
-                  keywords.
-                </p>
               </div>
-              <div className="form-bottom">
-                <span>
-                  <LockKeyhole />
-                  Files stay on your device
-                </span>
-                <Button type="submit" disabled={busy}>
-                  {busy ? (
-                    <>
-                      <Loader2 className="spinner" />
-                      Reading files
-                    </>
-                  ) : (
-                    <>
-                      Build report <ArrowRight />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
+              <Button type="button" onClick={buildSheet} disabled={busy}>
+                {busy ? (
+                  <>
+                    <Loader2 className="spinner" />
+                    Reading sheet
+                  </>
+                ) : (
+                  <>
+                    Connect Google Sheet <ArrowRight />
+                  </>
+                )}
+              </Button>
+            </div>
+            <details className="csv-alternative">
+              <summary>Or import CSV files</summary>
+              <form onSubmit={build} className="report-form">
+                <div
+                  className={"upload-area " + (dragging ? "is-dragging" : "")}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    if (!busy) setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragging(false);
+                    if (!busy) setFiles([...event.dataTransfer.files]);
+                  }}
+                >
+                  <div className="upload-icon">
+                    <UploadCloud />
+                  </div>
+                  <strong>Drop your location CSVs here</strong>
+                  <p>Or choose files from your computer</p>
+                  <Input
+                    type="file"
+                    id="report-files"
+                    accept=".csv,text/csv"
+                    multiple
+                    disabled={busy}
+                    aria-label="Choose location CSVs"
+                    onChange={(event) =>
+                      setFiles([...(event.target.files ?? [])])
+                    }
+                  />
+                  <small>
+                    One CSV per location. Include your input tab for seed hit
+                    rates.
+                  </small>
+                </div>
+                {files.length > 0 && (
+                  <div className="file-list" aria-live="polite">
+                    <span>
+                      {files.length} {files.length === 1 ? "file" : "files"}{" "}
+                      selected
+                    </span>
+                    {files.map((file, i) => (
+                      <Badge key={i} variant="secondary">
+                        <FileSpreadsheet size={12} />
+                        <span title={file.name}>{file.name}</span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          aria-label={"Remove " + file.name}
+                          onClick={() =>
+                            setFiles((previous) =>
+                              previous.filter((_, index) => index !== i),
+                            )
+                          }
+                        >
+                          <X size={12} />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="field">
+                  <Label htmlFor="report-brands">
+                    Brands to match <span>Optional</span>
+                  </Label>
+                  <Input
+                    id="report-brands"
+                    value={brands}
+                    disabled={busy}
+                    onChange={(event) => setBrands(event.target.value)}
+                    placeholder="Philips, Agaro, Prestige"
+                    maxLength={4000}
+                  />
+                  <p>
+                    Separate names with commas to distinguish branded and
+                    generic keywords.
+                  </p>
+                </div>
+                <div className="form-bottom">
+                  <span>
+                    <LockKeyhole />
+                    Files stay on your device
+                  </span>
+                  <Button type="submit" disabled={busy}>
+                    {busy ? (
+                      <>
+                        <Loader2 className="spinner" />
+                        Reading files
+                      </>
+                    ) : (
+                      <>
+                        Build report <ArrowRight />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </details>
           </CardContent>
         </Card>
         <Guide report />
@@ -1119,6 +1202,7 @@ function Reports() {
 }
 
 export default function App() {
+  const [sheet, setSheet] = useState("");
   const [workspace, setWorkspace] = useState<"collection" | "report">(
     "collection",
   );
@@ -1215,10 +1299,10 @@ export default function App() {
             </div>
           </header>
           <div hidden={workspace !== "collection"}>
-            <Collection />
+            <Collection sheet={sheet} setSheet={setSheet} />
           </div>
           <div hidden={workspace !== "report"}>
-            <Reports />
+            <Reports sheet={sheet} setSheet={setSheet} />
           </div>
           <footer>
             <span>The Bored Monkey · Keyword Workbench</span>

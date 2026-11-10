@@ -1120,3 +1120,30 @@ footer > span:last-child {
     scroll-behavior: auto !important;
   }
 }
+
+.sheet-report-controls {
+  display: grid;
+  gap: 20px;
+}
+.sheet-report-controls > button {
+  justify-self: start;
+}
+.csv-alternative {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.csv-alternative summary {
+  cursor: pointer;
+  color: #805023;
+  font-size: 12px;
+  font-weight: 600;
+}
+.csv-alternative .report-form {
+  margin-top: 20px;
+}
+@media (max-width: 600px) {
+  .sheet-report-controls > button {
+    width: 100%;
+  }
+}
