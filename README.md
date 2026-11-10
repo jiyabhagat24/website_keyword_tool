@@ -23,9 +23,9 @@ Component provenance and license are in `src/components/watermelon/`. The interf
 1. Import `workflows/Keyword Report - n8n Analysis.json` as a new n8n workflow. It is inactive when imported.
 2. In **Analysis Webhook**, create or choose a Header Auth credential with header name `X-Report-Key` and a strong value. Share that value only with people who may run reports. Replace `https://YOUR-WEBSITE-ORIGIN` in the webhook's allowed origins with the exact origin of your website.
 3. Connect the existing Google Sheets OAuth credential to **List Sheet Tabs** and **Read Sheet Tabs**. That Google account needs access to the copied spreadsheet.
-4. To use optional brand detection, connect the existing Google Gemini(PaLM) API credential to **Gemini Detect Brands**. Brand detection sends keywords to Gemini and can incur API charges. The workflow allows up to 5,000 distinct keywords when it is enabled. It uses `gemini-2.5-flash-lite`, which can be changed in that node.
+4. To use optional brand detection, connect the existing OpenAI credential to **OpenAI Detect Brands**. Brand detection sends keywords to OpenAI and can incur API charges. The workflow allows up to 5,000 distinct keywords when it is enabled. It uses `gpt-4.1-mini`, which can be changed in that node.
 5. Publish the workflow. Set `VITE_ANALYSIS_WEBHOOK_URL` in your hosting service to the production HTTPS webhook URL and rebuild the website. For local development, place that variable in the gitignored `.env.local` file.
-6. The user pastes the copied spreadsheet link into **Collect data**. After the workflow reports completion, **Open keyword report** carries that link to the report. Enter the analysis access key and select **Build report from sheet**. Gemini brand detection is optional and off by default. Review suggested brands before using them for decisions.
+6. The user pastes the copied spreadsheet link into **Collect data**. After the workflow reports completion, **Open keyword report** carries that link to the report. Enter the analysis access key and select **Build report from sheet**. OpenAI brand detection is optional and off by default. Review suggested brands before using them for decisions.
 
 The workflow reads the standard location and input tabs. Use CSV import for custom location names. The analysis runs after the user starts it and the n8n webhook responds; large sheets and paid brand detection can hit execution, response-size, rate, or proxy timeout limits. Check the n8n execution before retrying after a timeout. The live n8n workflow and its completion behavior must be tested in your instance before relying on automatic handoff.
 
@@ -38,3 +38,9 @@ The workflow reads the standard location and input tabs. Use CSV import for cust
 5. Download the summary or keyword details as CSV. In your original Google Sheet, use **File → Import → Upload** and choose **Insert new sheet(s)**.
 
 The report processes the CSVs in the browser. It uses distinct positive-volume keywords, counts volume tiers, and uses 1,000 search volume and 50 competition index as the quadrant thresholds. Google rounds search volumes, so the report shows volume buckets and peak values. Seasonality uses the median keyword-level ratio to December 2025 where dated month columns exist. City/state comparisons use keywords found with positive volume in both exported tabs.
+
+## Brand breakdown and strategic read
+
+- With a brand list, each location shows a table of brands (keywords, indicative volume, share of branded volume). Brands that appear in no location are listed under the table and in the CSV download. Volumes add up Google's rounded values, so they are a guide only.
+- **Write strategic read** sends the calculated summary (no raw keywords) to the analysis workflow, which asks OpenAI (`gpt-4.1-mini`) for 8–12 observation and hypothesis pairs. They are labelled as AI hypotheses; the numbers in them should be checked against the tables. It may incur API charges and only runs when the button is pressed.
+- After importing the updated workflow, connect your OpenAI credential to both **OpenAI Detect Brands** and **OpenAI Strategic Read**.

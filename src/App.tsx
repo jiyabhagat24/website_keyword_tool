@@ -69,9 +69,12 @@ import {
 } from "@/components/watermelon/native-select";
 import { WEBHOOKS, SHEETS, LOCATIONS, MONTHS } from "./config";
 import { sheetIdFromInput } from "./google-sheets";
-import { runAnalysisWorkflow } from "./analysis-workflow";
+import { runAnalysisWorkflow, requestStrategicRead } from "./analysis-workflow";
+import type { StrategicRead } from "./analysis-workflow";
 import {
   reportBuild,
+  reportBrandRows,
+  reportFacts,
   reportExportRows,
   reportSafeCsv,
   reportPercent,
@@ -170,7 +173,7 @@ function Guide({ report = false }: { report?: boolean }) {
         ],
         [
           "Choose brand names",
-          "Add brand names yourself, or enable Gemini to detect likely brands. AI usage may incur charges.",
+          "Add brand names yourself, or enable AI to detect likely brands. AI usage may incur charges.",
         ],
         [
           "Take your findings back",
@@ -611,6 +614,9 @@ function Reports({
   const [quadrant, setQuadrant] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [aiRead, setAiRead] = useState<StrategicRead | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
   const location = report?.locations[locationIndex];
   const matching = useMemo(
@@ -646,8 +652,24 @@ function Reports({
     setQuadrant(null);
     setSearch("");
     setPage(0);
+    setAiRead(null);
+    setAiMessage("");
     setReport(result);
     requestAnimationFrame(() => resultsRef.current?.focus());
+  }
+  async function writeStrategicRead() {
+    if (!report) return;
+    setAiBusy(true);
+    setAiMessage("");
+    try {
+      setAiRead(await requestStrategicRead(reportFacts(report), accessKey));
+    } catch (error) {
+      setAiMessage(
+        error instanceof Error ? error.message : "The strategic read failed.",
+      );
+    } finally {
+      setAiBusy(false);
+    }
   }
   async function buildSheet() {
     const id = sheetIdFromInput(sheet);
@@ -782,11 +804,9 @@ function Reports({
               <div className="setting-row">
                 <Sparkles />
                 <div>
-                  <Label htmlFor="detect-brands">
-                    Detect brands with Gemini
-                  </Label>
+                  <Label htmlFor="detect-brands">Detect brands with AI</Label>
                   <p>
-                    Optional. Sends keywords to Gemini and may use paid API
+                    Optional. Sends keywords to OpenAI and may use paid API
                     credits. Maximum 5,000 keywords per run.
                   </p>
                 </div>
@@ -811,8 +831,8 @@ function Reports({
                 />
                 {brandsDetected && (
                   <p>
-                    Review the detected names. Edit the list and turn off Gemini
-                    before rebuilding to use your corrections.
+                    Review the detected names. Edit the list and turn off AI
+                    detection before rebuilding to use your corrections.
                   </p>
                 )}
               </div>
@@ -1090,6 +1110,96 @@ function Reports({
                   them. Competition measures advertisers, and bids are
                   estimates.
                 </p>
+              </div>
+              {report.brands.length > 0 && (
+                <div className="brand-breakdown">
+                  <h3>Brands in {location.name}</h3>
+                  {reportBrandRows(location).length ? (
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Brand</th>
+                          <th>Keywords</th>
+                          <th>Indicative volume</th>
+                          <th>Share of branded volume</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportBrandRows(location)
+                          .slice(0, 15)
+                          .map((row) => (
+                            <tr key={row.brand}>
+                              <td>{row.brand}</td>
+                              <td>{format(row.keywords)}</td>
+                              <td>{format(row.volume)}</td>
+                              <td>{format(row.share)}%</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="helper">
+                      No brand from your list appears in this location.
+                    </p>
+                  )}
+                  <p className="helper">
+                    Volumes add up Google’s rounded values for each brand’s
+                    keywords, so treat them as a guide, not an exact figure.
+                    {report.absentBrands.length > 0 &&
+                      " Not found in any location: " +
+                        report.absentBrands.join(", ") +
+                        "."}
+                  </p>
+                </div>
+              )}
+              <div className="ai-read">
+                <h3>Strategic read (AI)</h3>
+                <p className="helper">
+                  Sends only the calculated summary above, not your keywords, to
+                  OpenAI. It may incur API charges. The result is a set of
+                  hypotheses, not facts from the data.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={aiBusy}
+                  onClick={writeStrategicRead}
+                >
+                  {aiBusy
+                    ? "Writing…"
+                    : aiRead
+                      ? "Write again"
+                      : "Write strategic read"}
+                </Button>
+                {aiMessage && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{aiMessage}</AlertDescription>
+                  </Alert>
+                )}
+                {aiRead && (
+                  <div>
+                    {aiRead.items.map((item, index) => (
+                      <div key={index} className="ai-item">
+                        <strong>{item.section}</strong>
+                        <p>{item.observation}</p>
+                        <p>
+                          <em>Hypothesis (AI):</em> {item.hypothesis}
+                        </p>
+                      </div>
+                    ))}
+                    {aiRead.caveats.length > 0 && (
+                      <ul>
+                        {aiRead.caveats.map((caveat, index) => (
+                          <li key={index}>{caveat}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="helper">
+                      Written by {aiRead.model}. Check every number against the
+                      tables before using it in a client document.
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="opportunity-grid">
                 <div>

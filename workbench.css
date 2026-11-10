@@ -1168,3 +1168,9 @@ footer > span:last-child {
   display: flex;
   margin-top: 12px;
 }
+
+.brand-breakdown, .ai-read { margin: 1.25rem 0; }
+.brand-breakdown table { width: 100%; border-collapse: collapse; }
+.brand-breakdown th, .brand-breakdown td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid rgba(128,128,128,0.25); }
+.ai-item { margin: 0.9rem 0; }
+.ai-item p { margin: 0.25rem 0; }
