@@ -3,38 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Website & Keyword Automation Tool</title>
+<title>Keyword Workbench</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  /* Single theme, tuned to feel like a native Apple surface: translucent
-     materials, a restrained accent, and type that tightens as it grows. */
   :root {
-    --bg-0: #ede4d8;
-    --bg-1: #f9f4ec;
-    --bg-gradient: radial-gradient(circle at 50% -10%, rgba(139, 106, 74, 0.10) 0%, transparent 55%);
+    --bg-0: #edf1e9;
+    --bg-1: #f7f8f2;
+    --bg-gradient: none;
 
-    --surface: rgba(255, 251, 245, 0.74);
+    --surface: #fffef9;
     --surface-hover: rgba(112, 84, 58, 0.06);
-    --surface-border: rgba(112, 84, 58, 0.14);
+    --surface-border: #d2dfd5;
     --surface-edge: rgba(255, 253, 248, 0.92);
     --input-bg: rgba(112, 84, 58, 0.05);
     --fill-tertiary: rgba(150, 118, 88, 0.16);
 
-    --text-primary: #2e241c;
-    --text-secondary: rgba(74, 58, 46, 0.68);
-    --text-muted: rgba(74, 58, 46, 0.42);
+    --text-primary: #1c322d;
+    --text-secondary: #47635a;
+    --text-muted: #587066;
 
-    --accent: #a9673a;
-    --accent-hover: #91542c;
+    --accent: #236757;
+    --accent-hover: #174c40;
     --success: #5c8a4a;
     --error: #c0503a;
     --error-bg: rgba(192, 80, 58, 0.09);
     --error-border: rgba(192, 80, 58, 0.24);
 
     --shadow-lg: 0 20px 40px -22px rgba(46, 36, 28, 0.22);
-    --shadow-glow: 0 0 0 3px rgba(169, 103, 58, 0.2);
+    --shadow-glow: 0 0 0 3px rgba(35, 103, 87, 0.2);
 
     --radius-xl: 20px;
     --radius-lg: 13px;
@@ -57,7 +55,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    #app.app-enter { animation: opacity 200ms ease; transform: none !important; }
+    #app.app-enter { animation: none; }
   }
 
   body {
@@ -721,15 +719,225 @@
     .page-header h1 { font-size: 1.65rem; }
     .card { padding: 22px 18px; }
   }
+
+  [hidden] { display: none !important; }
+
+  .page-header {
+    width: 100%;
+    max-width: 1100px;
+    text-align: left;
+    margin-bottom: 24px;
+    background: #153c3a;
+    color: #fffef9;
+    border-radius: 20px;
+    padding: clamp(22px, 5vw, 52px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 28px;
+    align-items: end;
+  }
+
+  .page-header h1 { font-size: clamp(2rem, 4.6vw, 3.35rem); max-width: 13ch; }
+  .page-header p { color: #d1e4dc; max-width: 46ch; }
+  .workbench-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 7px;
+  }
+  .workbench-steps li {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    align-items: center;
+    border-top: 1px solid #548079;
+    padding-top: 8px;
+    font-size: 0.9rem;
+  }
+  .workbench-steps span { color: #a9d8ca; font-variant-numeric: tabular-nums; }
+
+  .workspace-nav {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    max-width: 1100px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--surface-border);
+    margin-bottom: 22px;
+  }
+  .workspace-nav button {
+    padding: 9px 14px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.93rem;
+  }
+  .workspace-nav button:hover { background: var(--fill-tertiary); }
+  .workspace-nav [aria-pressed="true"] { background: #dcebe3; color: #154944; }
+
+  :focus-visible, .segmented input:focus-visible + label, .switch input:focus-visible + .switch-slider {
+    outline: 2px solid #24695c;
+    outline-offset: 3px;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  .report-workspace { width: 100%; max-width: 1100px; min-width: 0; }
+  .report-upload {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-xl);
+    padding: clamp(18px, 4vw, 34px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(22px, 5vw, 56px);
+  }
+  .report-intro h2, .report-result h2, .report-result h3, .report-result h4 { margin: 0; line-height: 1.25; }
+  .report-intro p, .report-intro li { color: var(--text-secondary); font-size: 0.9rem; }
+  .report-intro ol { padding-left: 1.2rem; }
+  .report-intro li + li { margin-top: 7px; }
+  #report-files {
+    padding: 10px;
+    border: 1px dashed #73978a;
+    border-radius: var(--radius-md);
+    min-width: 0;
+    width: 100%;
+    background: #f4f8f4;
+    font: inherit;
+    font-size: 0.83rem;
+  }
+  #report-files::file-selector-button {
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #154944;
+    background: #dcebe3;
+    margin-right: 9px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #report-build { align-self: start; }
+  .report-caption { color: var(--text-secondary); font-size: 0.85rem; margin: 4px 0; }
+  .report-caption:empty, .report-status:empty { display: none; }
+  .report-status { white-space: pre-line; overflow-wrap: anywhere; font-size: 0.9rem; color: var(--error); }
+  .report-result { margin-top: 24px; }
+  .report-result-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .report-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 16px 0;
+    border: 1px solid #bdd5c9;
+    border-radius: var(--radius-lg);
+    background: #e5f0e9;
+  }
+  .report-stats div { min-width: 0; padding: clamp(12px, 2.5vw, 24px); }
+  .report-stats div + div { border-left: 1px solid #bdd5c9; }
+  .report-stats dt, .report-stats span { color: #325a51; font-size: 0.82rem; }
+  .report-stats dd { margin: 0; }
+  .report-stats dd strong {
+    display: block;
+    margin: 3px 0;
+    color: #153c3a;
+    font-size: clamp(1.55rem, 4vw, 2.75rem);
+    font-weight: 700;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .report-block {
+    padding: clamp(15px, 3vw, 24px);
+    margin-bottom: 14px;
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-lg);
+    min-width: 0;
+  }
+  .report-scroll { overflow: auto; margin-top: 10px; }
+  .report-scroll table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+  .report-scroll th, .report-scroll td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--surface-border);
+    overflow-wrap: anywhere;
+  }
+  .report-scroll th { color: #154944; background: #eff5f0; }
+  .report-scroll tr:last-child td { border-bottom: 0; }
+  .report-select-label, .report-keyword-controls { display: flex; align-items: center; gap: 9px; font-size: 0.85rem; }
+  .report-select-label select { width: auto; min-width: 125px; max-width: 100%; }
+  .report-location-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 24px;
+    margin-top: 16px;
+  }
+  .report-location-detail h4 { margin-bottom: 9px; }
+  .report-matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .matrix-cell {
+    display: grid;
+    gap: 2px;
+    padding: 10px 12px;
+    text-align: left;
+    color: #153c3a;
+    background: #e9f2ec;
+    border: 1px solid #c6dacf;
+    border-radius: 8px;
+  }
+  .matrix-cell:last-child { grid-column: 1 / -1; background: #f4f6f2; }
+  .matrix-cell[aria-pressed="true"], .matrix-cell:hover { background: #cfe5d9; border-color: #73978a; }
+  .matrix-cell strong { font-size: 1.4rem; line-height: 1.1; }
+  .matrix-cell small { font-weight: 400; color: #34564e; }
+  .tier-row { display: grid; grid-template-columns: 6.2rem 1fr auto; align-items: center; gap: 8px; font-size: 0.8rem; margin-bottom: 10px; }
+  .tier-track { background: #e6eee8; height: 7px; border-radius: 4px; }
+  .tier-track div { background: #367866; height: 100%; border-radius: inherit; }
+  .report-keyword-controls { flex-wrap: wrap; margin-top: 12px; }
+  .report-keyword-controls input {
+    flex: 1;
+    min-width: min(100%, 170px);
+    padding: 9px 11px;
+    background: var(--input-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font: inherit;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px; }
+    .page-header, .report-upload, .report-location-detail { grid-template-columns: 1fr; }
+    .page-header h1 { font-size: clamp(2rem, 8vw, 2.65rem); }
+    .workbench-steps { display: none; }
+    .report-scroll table { min-width: 500px; }
+  }
+  @media (max-width: 400px) {
+    .report-stats { grid-template-columns: 1fr; }
+    .report-stats div + div { border-left: 0; border-top: 1px solid #bdd5c9; }
+  }
 </style>
 </head>
 <body>
 
-<div class="page-header">
-  <h1>Website & Keyword Analysis</h1>
-</div>
+<header class="page-header">
+  <div>
+    <h1>Keyword Workbench</h1>
+    <p>Collect search data in Google Sheets, then see where demand and competition meet.</p>
+  </div>
+  <ol class="workbench-steps" aria-label="Workflow">
+    <li><span>01</span> Collect keyword data</li>
+    <li><span>02</span> Export location tabs</li>
+    <li><span>03</span> Compare opportunities</li>
+  </ol>
+</header>
 
-<div class="layout-container">
+<nav class="workspace-nav" aria-label="Workspace">
+  <button type="button" data-workspace="launcher" aria-pressed="true" aria-controls="launcher-workspace">Collect data</button>
+  <button type="button" data-workspace="report" aria-pressed="false" aria-controls="report-workspace">Keyword report</button>
+</nav>
+
+<main id="launcher-workspace" class="layout-container">
   <!-- LEFT COLUMN: Main Automation Tool Card -->
   <div class="card main-tool-card">
     <div class="card-header">
@@ -773,78 +981,126 @@
       <div class="step-item">
         <div class="step-number">1</div>
         <div class="step-content">
-          <h3 class="step-title">Pick a Tool</h3>
-          <p class="step-desc">Click <strong>Website Tool</strong> or <strong>Keyword Tool</strong> at the top left.</p>
+          <h3 class="step-title">Copy a Google Sheet template</h3>
+          <p class="step-desc">Open the template for your tool and make a copy. Give the Google account used by the automation Editor access.</p>
         </div>
       </div>
-
       <div class="step-item">
         <div class="step-number">2</div>
         <div class="step-content">
-          <h3 class="step-title">Copy the Template Sheet</h3>
-          <p class="step-desc">Click <strong>Copy Template Google Sheet</strong> on the left, then click <strong>Make a copy</strong>. This is your sheet now, so keep the tab open.</p>
+          <h3 class="step-title">Add your websites or keywords</h3>
+          <p class="step-desc">Use column A in <strong>Website Input</strong> or <strong>Keyword input</strong>, starting at row 2.</p>
         </div>
       </div>
-
       <div class="step-item">
         <div class="step-number">3</div>
         <div class="step-content">
-          <h3 class="step-title">Share It as Editor</h3>
-          <p class="step-desc">Click <strong>Share</strong> (top right of the sheet) → set access to <strong>Anyone with the link</strong> → change role to <strong>Editor</strong>. This lets the automation write your results in.</p>
+          <h3 class="step-title">Run the request</h3>
+          <p class="step-desc">Paste the link to your copy, choose locations or dates if needed, and submit.</p>
         </div>
       </div>
-
       <div class="step-item">
         <div class="step-number">4</div>
         <div class="step-content">
-          <h3 class="step-title">Add Your Input to the Sheet</h3>
-          <p class="step-desc"><strong>Website Tool:</strong> open the <strong>Website Input</strong> tab, column A is headed <strong>website</strong> — type your site's URL in cell A2.</p>
-          <p class="step-desc" style="margin-top:8px;"><strong>Keyword Tool:</strong> open the <strong>Keyword input</strong> tab, column A is headed <strong>Keyword</strong> — type your keywords down that column starting at A2, one per row.</p>
-        </div>
-      </div>
-
-      <div class="step-item">
-        <div class="step-number">5</div>
-        <div class="step-content">
-          <h3 class="step-title">Copy the Sheet's Link</h3>
-          <p class="step-desc">Click the address bar at the top of your browser and copy the whole link.</p>
-
-          <div class="url-guide-box">
-            <span class="url-prefix">https://docs.google.com/spreadsheets/d/</span>
-            <span class="url-sheet-id">1NEymr4St_ZgL5UUW_h4TGO8xbcy20Bu7V9edCuuIWkU</span>
-            <span class="url-suffix">/edit#gid=0</span>
-          </div>
-
-          <div class="guide-annotation">That's your Sheet ID, highlighted above. No need to trim it — the full link works too.</div>
-        </div>
-      </div>
-
-      <div class="step-item">
-        <div class="step-number">6</div>
-        <div class="step-content">
-          <h3 class="step-title">Paste It In</h3>
-          <p class="step-desc">Come back here and paste the link into the <strong>Sheet URL</strong> box on the left.</p>
-        </div>
-      </div>
-
-      <div class="step-item">
-        <div class="step-number">7</div>
-        <div class="step-content">
-          <h3 class="step-title">Adjust Options (Optional)</h3>
-          <p class="step-desc"><strong>All Locations</strong> covers India + every state by default. <strong>Custom Date Range</strong> defaults to the last 12 months. Only touch these if you want something different.</p>
-        </div>
-      </div>
-
-      <div class="step-item">
-        <div class="step-number">8</div>
-        <div class="step-content">
-          <h3 class="step-title">Submit</h3>
-          <p class="step-desc">Hit <strong>Submit Request</strong>. Your sheet fills in on its own within a minute.</p>
+          <h3 class="step-title">Compare the results</h3>
+          <p class="step-desc">Once your location tabs fill in, export them as CSV and open <strong>Keyword report</strong> above.</p>
         </div>
       </div>
     </div>
   </div>
-</div>
+</main>
+
+<main id="report-workspace" class="report-workspace" hidden>
+  <section class="report-upload" aria-labelledby="report-title">
+    <div class="report-intro">
+      <h2 id="report-title">Read your keyword results</h2>
+      <p>Compare locations, find low-competition terms, and take a summary back to Google Sheets.</p>
+      <ol>
+        <li>Open a location tab in Google Sheets.</li>
+        <li>Choose <strong>File → Download → Comma-separated values (.csv)</strong>.</li>
+        <li>Repeat for each location you want to compare.</li>
+      </ol>
+    </div>
+    <form id="report-form">
+      <div class="form-group">
+        <label class="field-label-row" for="report-files">Location CSVs</label>
+        <input id="report-files" type="file" accept=".csv,text/csv" multiple required aria-describedby="report-file-help report-file-count">
+        <p id="report-file-count" class="report-caption">No files selected</p>
+        <p id="report-file-help" class="report-caption">Include <strong>Keyword input</strong> or <strong>Website Input</strong> for seed hit rates. Files stay in your browser.</p>
+      </div>
+      <div class="form-group">
+        <label class="field-label-row" for="report-brands">Brands to match <span class="label-hint">Optional</span></label>
+        <input id="report-brands" type="text" placeholder="Philips, Agaro, Prestige" maxlength="4000" aria-describedby="report-brand-help">
+        <p id="report-brand-help" class="report-caption">Separate brand names with commas. Intent tags use fixed phrase rules.</p>
+      </div>
+      <button type="submit" id="report-build" class="primary-btn">Build report</button>
+    </form>
+  </section>
+  <p id="report-status" class="report-status" role="status"></p>
+
+  <section id="report-result" class="report-result" hidden aria-labelledby="report-results-heading">
+    <div class="report-result-head">
+      <div>
+        <h2 id="report-results-heading" tabindex="-1">Keyword Summary</h2>
+        <p class="report-caption">Volumes come from rounded Google estimates. Compare buckets and tiers.</p>
+      </div>
+      <button type="button" id="report-download" class="secondary-btn">Download Summary CSV</button>
+    </div>
+    <dl class="report-stats">
+      <div><dt>Locations</dt><dd><strong id="report-locations"></strong><span>CSV tabs included</span></dd></div>
+      <div><dt>Keywords with demand</dt><dd><strong id="report-keywords"></strong><span>Distinct across all locations</span></dd></div>
+      <div><dt>Seed hit rate</dt><dd><strong id="report-seed-rate"></strong><span id="report-seed-detail"></span></dd></div>
+    </dl>
+
+    <section class="report-block" aria-labelledby="report-demand-heading">
+      <h3 id="report-demand-heading">Demand by location</h3>
+      <p id="report-coverage" class="report-caption"></p>
+      <div id="report-location-table" class="report-scroll" tabindex="0" aria-label="Demand by location table"></div>
+    </section>
+
+    <section class="report-block" aria-labelledby="report-opportunity-heading">
+      <div class="report-result-head">
+        <div>
+          <h3 id="report-opportunity-heading">Competition and volume</h3>
+          <p class="report-caption">High volume starts at 1,000. High competition starts at 50.</p>
+        </div>
+        <label class="report-select-label" for="report-location">Location
+          <select id="report-location"></select>
+        </label>
+      </div>
+      <div class="report-location-detail">
+        <div>
+          <h4>Competition matrix</h4>
+          <div id="report-matrix" class="report-matrix" aria-label="Filter keywords by competition quadrant"></div>
+        </div>
+        <div>
+          <h4>Volume tiers</h4>
+          <div id="report-tier-table"></div>
+          <p id="report-city" class="report-caption"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="report-block" aria-labelledby="report-keyword-heading">
+      <div class="report-result-head">
+        <h3 id="report-keyword-heading">Keyword explorer</h3>
+        <button type="button" id="report-keyword-download" class="secondary-btn">Download Keyword CSV</button>
+      </div>
+      <div class="report-keyword-controls">
+        <label for="report-search">Find a keyword</label>
+        <input id="report-search" type="search" placeholder="Search within this location">
+      </div>
+      <p id="report-keyword-count" class="report-caption" role="status"></p>
+      <div id="report-keyword-table" class="report-scroll" tabindex="0" aria-label="Keyword results table"></div>
+    </section>
+
+    <section class="report-block" aria-labelledby="report-season-heading">
+      <h3 id="report-season-heading">Seasonality</h3>
+      <p id="report-season-note" class="report-caption"></p>
+      <div id="report-season" class="report-scroll"></div>
+    </section>
+  </section>
+</main>
 
 <script>
 const WEBHOOKS = {
@@ -937,6 +1193,7 @@ const modeBadge = document.getElementById("active-mode-badge");
 // persistent navigation), so track which mode is active separately and
 // re-render the form whenever it changes.
 let activeType = "website";
+let formRevision = 0;
 
 // Restarts the app-enter animation on the container. Called right after
 // app.innerHTML is replaced so every screen transition (Form -> Loading ->
@@ -957,6 +1214,7 @@ document.getElementById("mode-keywords").addEventListener("change", (e) => {
 
 function renderConfirm(type) {
   activeType = type;
+  formRevision++;
   const isWebsite = type === "website";
   if (modeBadge) modeBadge.textContent = isWebsite ? "Website Analysis" : "Keyword Research";
 
@@ -964,7 +1222,7 @@ function renderConfirm(type) {
     <form onsubmit="return false;">
       <div class="form-group">
         <label class="field-label-row">
-          Create a copy of this Google Sheet and change access to anyone with the link can edit
+          Google Sheet template
         </label>
         <div style="display:flex; justify-content:flex-start;">
           <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">
@@ -978,17 +1236,17 @@ function renderConfirm(type) {
         <label class="field-label-row" for="tool-input">
           Sheet URL
         </label>
-        <input type="text" id="tool-input" placeholder="e.g. https://docs.google.com/spreadsheets/d/1NEymr4St_ZgL5UUW...">
+        <input type="text" id="tool-input" placeholder="Paste your Sheet URL or ID" autocomplete="off">
       </div>
 
       <div class="form-group">
         <div class="toggle-row">
           <div class="toggle-text">
             <span class="toggle-title">All Locations</span>
-            <span class="toggle-hint">India + all 48 states and cities. Turn off to pick specific ones.</span>
+            <span class="toggle-hint">All 48 locations, including India. Turn off to choose specific locations.</span>
           </div>
           <label class="switch">
-            <input type="checkbox" id="all-locations-toggle" checked>
+            <input type="checkbox" id="all-locations-toggle" aria-label="All locations" checked>
             <span class="switch-slider"></span>
           </label>
         </div>
@@ -1010,7 +1268,7 @@ function renderConfirm(type) {
             <span class="toggle-hint">Default: trailing 12 months from today.</span>
           </div>
           <label class="switch">
-            <input type="checkbox" id="custom-daterange-toggle">
+            <input type="checkbox" id="custom-daterange-toggle" aria-label="Custom date range">
             <span class="switch-slider"></span>
           </label>
         </div>
@@ -1019,19 +1277,19 @@ function renderConfirm(type) {
             <div class="daterange-grid">
               <div>
                 <div class="field-label">Start Month</div>
-                <select id="start-month"></select>
+                <select id="start-month" aria-label="Start month"></select>
               </div>
               <div>
                 <div class="field-label">Start Year</div>
-                <select id="start-year"></select>
+                <select id="start-year" aria-label="Start year"></select>
               </div>
               <div>
                 <div class="field-label">End Month</div>
-                <select id="end-month"></select>
+                <select id="end-month" aria-label="End month"></select>
               </div>
               <div>
                 <div class="field-label">End Year</div>
-                <select id="end-year"></select>
+                <select id="end-year" aria-label="End year"></select>
               </div>
             </div>
           </div>
@@ -1079,14 +1337,14 @@ function renderError(type, message) {
   document.getElementById("retry-btn").onclick = () => renderConfirm(type);
 }
 
-function renderPending(type) {
+function renderPending(type, sheetLink) {
   app.innerHTML = `
     <div class="pending-box">
       <strong>Request submitted successfully.</strong><br/>
-      Your task is being processed. The results will automatically populate your Google Sheet shortly (usually within 30-60 seconds).
+      The workflow is running. Check your spreadsheet for results once it finishes.
     </div>
     <div style="margin-top:16px;">
-      <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">
+      <a class="sheet-link" href="${sheetLink}" target="_blank" rel="noopener noreferrer">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
         Open Google Sheet
       </a>
@@ -1099,13 +1357,13 @@ function renderPending(type) {
   document.getElementById("reset-btn").onclick = () => renderConfirm(activeType);
 }
 
-function renderResult(type, data) {
+function renderResult(type, data, sheetLink) {
   const isKeywords = type === "keywords";
   const body = isKeywords ? renderAsTable(data) : `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
   app.innerHTML = `
     <div class="result-box">${body}</div>
     <div style="margin-top:16px;">
-      <a class="sheet-link" href="${SHEETS[type]}" target="_blank" rel="noopener noreferrer">Open Google Sheet</a>
+      <a class="sheet-link" href="${sheetLink}" target="_blank" rel="noopener noreferrer">Open Google Sheet</a>
     </div>
     <div class="footer-actions form-actions" style="margin-top:20px;">
       <button class="secondary-btn" id="reset-btn">Start Over</button>
@@ -1148,9 +1406,9 @@ function escapeHtml(str) {
 
 function parseSheetId(val) {
   if (!val) return null;
-  const match = val.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const match = val.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)(?:[/?#]|$)/);
   if (match && match[1]) return match[1];
-  if (!val.includes("/") && !val.includes("http") && val.length > 15) return val;
+  if (/^[a-zA-Z0-9_-]{16,}$/.test(val)) return val;
   return null;
 }
 
@@ -1168,8 +1426,16 @@ async function submitRequest(type) {
   const payload = { sheetUrl: SHEET_IDS[type] };
 
   if (typedValue) {
-    payload.sheetUrl = parseSheetId(typedValue) || typedValue;
+    const sheetId = parseSheetId(typedValue);
+    if (!sheetId) {
+      inputEl.setCustomValidity("Enter a Google Sheets URL or Sheet ID.");
+      inputEl.reportValidity();
+      inputEl.addEventListener("input", () => inputEl.setCustomValidity(""), { once: true });
+      return;
+    }
+    payload.sheetUrl = sheetId;
   }
+  const sheetLink = "https://docs.google.com/spreadsheets/d/" + payload.sheetUrl + "/edit";
 
   // Location toggle - always send an explicit allLocations flag, and always
   // send the locations array whenever it's not the "everything" case, so the
@@ -1198,6 +1464,7 @@ async function submitRequest(type) {
 
   // Now it's safe to swap the form out for the loading spinner - every field
   // we need has already been read into `payload` above.
+  const submittedRevision = formRevision;
   renderLoading();
 
   const controller = new AbortController();
@@ -1221,6 +1488,7 @@ async function submitRequest(type) {
     clearTimeout(timeout);
 
     const rawText = await res.text();
+    if (submittedRevision !== formRevision) return;
     const headers = {};
     res.headers.forEach((v, k) => { headers[k] = v; });
     const responseInfo = { status: res.status, statusText: res.statusText, headers, body: rawText };
@@ -1232,7 +1500,7 @@ async function submitRequest(type) {
     }
 
     if (!rawText.trim()) {
-      renderPending(type);
+      renderPending(type, sheetLink);
       return;
     }
 
@@ -1243,9 +1511,10 @@ async function submitRequest(type) {
       data = rawText;
     }
 
-    renderResult(type, data);
+    renderResult(type, data, sheetLink);
   } catch (err) {
     clearTimeout(timeout);
+    if (submittedRevision !== formRevision) return;
     const message = err.name === "AbortError"
       ? "The request timed out. Please try again."
       : `Something went wrong: ${err.message}`;
@@ -1255,5 +1524,6 @@ async function submitRequest(type) {
 
 renderConfirm("website");
 </script>
+<script src="keyword-report.js" defer></script>
 </body>
 </html>
