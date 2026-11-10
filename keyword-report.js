@@ -290,6 +290,14 @@ function reportFormat(value) {
 }
 
 function reportShowWorkspace(workspace) {
+  const isReport = workspace === "report";
+  document.getElementById("workspace-heading").textContent = isReport
+    ? "Find your next search opportunity." : "Start with better search data.";
+  document.getElementById("workspace-description").textContent = isReport
+    ? "Compare demand, competition, and seasonality across your location exports."
+    : "Turn websites and seed keywords into a location-by-location view of demand.";
+  document.getElementById("workspace-breadcrumb").textContent = isReport ? "Keyword report" : "Collect data";
+  document.querySelector(".skip-link").href = isReport ? "#report-workspace" : "#launcher-workspace";
   document.getElementById("launcher-workspace").hidden = workspace === "report";
   document.getElementById("report-workspace").hidden = workspace !== "report";
   for (const button of document.querySelectorAll("[data-workspace]")) {
@@ -304,6 +312,30 @@ for (const button of document.querySelectorAll("[data-workspace]")) {
 reportFiles.addEventListener("change", () => {
   const count = reportFiles.files.length;
   reportFileCount.textContent = count ? count + (count === 1 ? " CSV selected" : " CSVs selected") : "No files selected";
+});
+
+const uploadZone = document.getElementById("upload-zone");
+for (const eventName of ["dragenter", "dragover"]) {
+  uploadZone.addEventListener(eventName, event => {
+    event.preventDefault();
+    uploadZone.classList.add("drag-over");
+  });
+}
+uploadZone.addEventListener("dragleave", event => {
+  if (!uploadZone.contains(event.relatedTarget)) uploadZone.classList.remove("drag-over");
+});
+uploadZone.addEventListener("drop", event => {
+  event.preventDefault();
+  uploadZone.classList.remove("drag-over");
+  if (!event.dataTransfer.files.length) return;
+  reportFiles.files = event.dataTransfer.files;
+  reportFiles.dispatchEvent(new Event("change"));
+});
+
+document.getElementById("report-clear-filter").addEventListener("click", () => {
+  activeQuadrant = null;
+  reportRenderLocation();
+  reportSearch.focus();
 });
 
 function reportTable(headers, rows) {
@@ -396,6 +428,7 @@ function reportMatchingKeywords() {
 }
 
 function reportRenderKeywords() {
+  document.getElementById("report-clear-filter").hidden = activeQuadrant === null;
   const matching = reportMatchingKeywords();
   const limit = 50;
   document.getElementById("report-keyword-count").textContent = !matching.length ? "No keywords match." :
