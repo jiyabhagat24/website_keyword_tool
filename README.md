@@ -1,10 +1,20 @@
 # Keyword Workbench
 
-A static website for collecting search data through n8n and comparing the results from Google Sheets. Open `index.html` directly or serve this directory from any static host.
+A React and TypeScript workbench for collecting search data through n8n and comparing Google Sheets exports. Uses Watermelon UI source components and Tailwind CSS, themed with The Bored Monkey’s orange, yellow, charcoal, and white palette.
+
+## Run locally
+
+Use Node.js 22.12 or newer. Run `npm ci` and `npm run dev`.
+
+## Build and publish
+
+Run `npm run build` to check TypeScript and produce the static site in `dist/`. Run `npm run preview` to preview that build. Configure your static host to run `npm ci && npm run build` and publish `dist/`. The relative asset base supports hosting under a repository subpath. Build output is gitignored.
+
+Component provenance and license are in `src/components/watermelon/`. The interface uses Watermelon buttons, cards, inputs, labels, switches, checkboxes, tabs, badges, alerts, accordions, selects, and tables.
 
 ## Collect data
 
-1. Select **Website Tool** or **Keyword Tool** and copy its Google Sheet template.
+1. Select **From websites** or **From keywords** and copy its Google Sheet template.
 2. Give the Google account used by the automation Editor access to your copy. Add your input in the matching input tab.
 3. Paste your spreadsheet link or ID into the workbench, choose locations or dates if needed, and submit. The workflow writes results to the spreadsheet.
 
