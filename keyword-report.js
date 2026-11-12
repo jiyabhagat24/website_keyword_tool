@@ -18,6 +18,7 @@ const reportQuadrants = [
   "Whitespace",
   "Competition unavailable",
 ];
+/** @type {[string, RegExp][]} */
 const reportIntents = [
   [
     "Price",
@@ -125,6 +126,16 @@ function reportReadNumber(raw) {
   return Number.isFinite(value) ? value : null;
 }
 
+function reportReadBid(raw, header, unmarkedBidsInRupees) {
+  const text = String(raw ?? "").trim();
+  const amount = reportReadNumber(text.replace(/^₹\s*/, ""));
+  if (amount === null) return null;
+  if (text.startsWith("₹") || / \((?:₹|inr)\)$/.test(header)) return amount;
+  if (header.endsWith(" (micros)") || !unmarkedBidsInRupees)
+    return amount / 1_000_000;
+  return amount;
+}
+
 function reportMedian(values) {
   if (!values.length) return null;
   values.sort((left, right) => left - right);
@@ -182,12 +193,27 @@ function reportReadLocation(name, rows, getTags) {
   );
   const competitionColumn = columns.indexOf("competition index");
   const lowBidColumn = columns.findIndex((label) =>
-    ["low big", "low bid"].includes(label),
+    /^low (?:bid|big)(?: \((?:₹|inr|micros)\))?$/.test(label),
   );
-  const highBidColumn = columns.indexOf("high bid");
+  const highBidColumn = columns.findIndex((label) =>
+    /^high bid(?: \((?:₹|inr|micros)\))?$/.test(label),
+  );
   if (rows.length && (keywordColumn < 0 || volumeColumn < 0)) {
     throw new Error("Expected Keyword and Search volume columns.");
   }
+  // The older workflows write integer micros into unlabelled bid columns.
+  const unmarkedBidColumns = [lowBidColumn, highBidColumn].filter((index) =>
+    ["low big", "low bid", "high bid"].includes(columns[index]),
+  );
+  const unmarkedBidsInRupees = records.some((row) =>
+    unmarkedBidColumns.some((index) => {
+      const text = (row[index] ?? "").trim();
+      const amount = reportReadNumber(text);
+      return (
+        text.startsWith("₹") || (amount !== null && !Number.isInteger(amount))
+      );
+    }),
+  );
   const months = columns
     .flatMap((label, index) => {
       const match = label.match(/^([a-z]+) (\d{4})$/);
@@ -197,15 +223,26 @@ function reportReadLocation(name, rows, getTags) {
         : [{ label, index, order: Number(match[2]) * 12 + month, ratios: [] }];
     })
     .sort((left, right) => left.order - right.order);
-  const baseline = months.find((month) => month.label === reportBaseline);
+  const baselineIndex = months.findIndex(
+    (month) => month.label === reportBaseline,
+  );
+  const baseIndex = Math.max(0, baselineIndex);
+  /** @type {string[]} */
+  const monthLabels = months.map(
+    ({ label }) => label[0].toUpperCase() + label.slice(1),
+  );
+  /** @type {Map<string, {keyword: string, volume: number, competition: number | null, lowBidInr: number | null, highBidInr: number | null, tier: number, quadrant: number, monthly: (number | null)[], brand: string, brandName: string, intents: number[]}>} */
   const keywords = new Map();
   const tiers = reportTiers.map(() => 0);
   const quadrants = reportQuadrants.map(() => 0);
   const buckets = new Set();
   let maxVolume = null;
   let branded = 0;
+  let reportedVolume = 0;
+  let brandedVolume = 0;
   const intentCounts = reportIntents.map(() => 0);
-  /** @type {Map<string, {keywords: number, volume: number}>} */
+  const intentVolumes = reportIntents.map(() => 0);
+  /** @type {Map<string, {keywords: number, volume: number, monthlyRatios: number[][]}>} */
   const brandStats = new Map();
   for (const row of records) {
     const keyword = (row[keywordColumn] ?? "").trim();
@@ -217,49 +254,82 @@ function reportReadLocation(name, rows, getTags) {
     const tier = reportTier(volume);
     const quadrant = reportQuadrant(volume, competition);
     const tags = getTags(key);
+    const monthly = months.map(({ index }) => reportReadNumber(row[index]));
+    const baseVolume = monthly[baseIndex];
     keywords.set(key, {
       keyword,
       volume,
       competition,
-      lowBidMicros: reportReadNumber(row[lowBidColumn]),
-      highBidMicros: reportReadNumber(row[highBidColumn]),
+      lowBidInr: reportReadBid(
+        row[lowBidColumn],
+        columns[lowBidColumn] ?? "",
+        unmarkedBidsInRupees,
+      ),
+      highBidInr: reportReadBid(
+        row[highBidColumn],
+        columns[highBidColumn] ?? "",
+        unmarkedBidsInRupees,
+      ),
       tier,
       quadrant,
+      monthly,
       ...tags,
     });
     tiers[tier]++;
     quadrants[quadrant]++;
     buckets.add(volume);
     maxVolume = Math.max(maxVolume ?? 0, volume);
+    reportedVolume += volume;
+    for (const intent of tags.intents) {
+      intentCounts[intent]++;
+      intentVolumes[intent] += volume;
+    }
+    const ratios = monthly.map((value) =>
+      baseVolume && value !== null ? (100 * value) / baseVolume : null,
+    );
     if (tags.brand === "Branded") {
       branded++;
-      const stat = brandStats.get(tags.brandName) ?? { keywords: 0, volume: 0 };
+      brandedVolume += volume;
+      const stat = brandStats.get(tags.brandName) ?? {
+        keywords: 0,
+        volume: 0,
+        monthlyRatios: monthLabels.map(() => []),
+      };
       stat.keywords++;
       stat.volume += volume;
+      ratios.forEach((ratio, index) => {
+        if (ratio !== null) stat.monthlyRatios[index].push(ratio);
+      });
       brandStats.set(tags.brandName, stat);
     }
-    for (const intent of tags.intents) intentCounts[intent]++;
-    const baseVolume = reportReadNumber(row[baseline?.index]);
-    if (!baseVolume) continue;
-    for (const month of months) {
-      const monthly = reportReadNumber(row[month.index]);
-      if (monthly !== null) month.ratios.push((100 * monthly) / baseVolume);
-    }
+    ratios.forEach((ratio, index) => {
+      if (ratio !== null) months[index].ratios.push(ratio);
+    });
   }
   /** @type {{label: string, index: number | null, pairs: number}[]} */
-  const seasonality = months.map((month) => ({
-    label: month.label.replace(/^./, (letter) => letter.toUpperCase()),
+  const seasonality = months.map((month, index) => ({
+    label: monthLabels[index],
     index: reportMedian(month.ratios),
     pairs: month.ratios.length,
   }));
   const usableMonths = seasonality.filter((month) => month.pairs).length;
-  const seasonNote = !baseline
-    ? "No December 2025 column"
+  const seasonNote = !monthLabels.length
+    ? "No dated monthly columns"
     : !usableMonths
-      ? "No keywords with a positive December baseline"
+      ? `No keywords with a positive ${monthLabels[baseIndex]} baseline`
       : usableMonths < 12
         ? "Fewer than 12 usable months"
         : "";
+  const brandTrends = new Map(
+    [...brandStats].map(([brand, stat]) => [
+      brand,
+      stat.monthlyRatios.map((ratios, index) => ({
+        label: monthLabels[index],
+        index: reportMedian(ratios),
+        pairs: ratios.length,
+      })),
+    ]),
+  );
   return {
     name,
     keywords,
@@ -267,15 +337,21 @@ function reportReadLocation(name, rows, getTags) {
     quadrants,
     seedHits: 0,
     cityState:
-      /** @type {{name: string, index: number | null, pairs: number} | null} */ (
+      /** @type {{name: string, index: number | null, volumeShare: number | null, pairs: number} | null} */ (
         null
       ),
     buckets: buckets.size,
     maxVolume,
+    reportedVolume,
+    brandedVolume,
+    intentVolumes,
+    monthLabels,
+    baselineLabel: monthLabels[baseIndex] ?? null,
     seasonality,
     seasonNote,
     branded,
     brandStats,
+    brandTrends,
     intentCounts,
   };
 }
@@ -285,13 +361,21 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
   const errors = [];
   const seeds = new Set();
   const websiteSeeds = new Set();
-  const brands = [
-    ...new Set(rawBrands.split(",").map(reportNormalize).filter(Boolean)),
-  ];
-  const brandPattern = brands.length
+  const brands = new Set();
+  const brandAliases = new Map();
+  for (const entry of rawBrands.split(",")) {
+    const [brand, ...aliases] = entry.split("|").map(reportNormalize);
+    if (!brand) continue;
+    brands.add(brand);
+    brandAliases.set(brand, brand);
+    for (const alias of aliases.filter(Boolean))
+      if (!brandAliases.has(alias)) brandAliases.set(alias, brand);
+  }
+  const brandPattern = brandAliases.size
     ? new RegExp(
         "(?:^|[^\\p{L}\\p{N}])(" +
-          brands
+          [...brandAliases.keys()]
+            .sort((a, b) => b.length - a.length)
             .map((brand) => brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
             .join("|") +
           ")(?=$|[^\\p{L}\\p{N}])",
@@ -304,7 +388,7 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
       const hit = brandPattern ? brandPattern.exec(keyword) : null;
       tagsByKeyword.set(keyword, {
         brand: brandPattern ? (hit ? "Branded" : "Generic") : "",
-        brandName: hit ? hit[1] : "",
+        brandName: hit ? brandAliases.get(hit[1]) : "",
         intents: reportIntents.flatMap(([, rule], index) =>
           rule.test(keyword) ? [index] : [],
         ),
@@ -366,13 +450,19 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
     const state = byLocation.get(reportNormalize(stateName));
     if (!state) continue;
     const ratios = [];
+    let matchedCityVolume = 0;
+    let matchedStateVolume = 0;
     for (const [keyword, row] of location.keywords) {
       const stateRow = state.keywords.get(keyword);
-      if (stateRow) ratios.push((100 * row.volume) / stateRow.volume);
+      if (!stateRow) continue;
+      ratios.push((100 * row.volume) / stateRow.volume);
+      matchedCityVolume += row.volume;
+      matchedStateVolume += stateRow.volume;
     }
     location.cityState = {
       name: state.name,
       index: reportMedian(ratios),
+      volumeShare: reportPercent(matchedCityVolume, matchedStateVolume),
       pairs: ratios.length,
     };
   }
@@ -389,8 +479,8 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
     locations,
     errors,
     unique: tagsByKeyword.size,
-    brands,
-    absentBrands: brands.filter((brand) => !seenBrands.has(brand)),
+    brands: [...brands],
+    absentBrands: [...brands].filter((brand) => !seenBrands.has(brand)),
     seedCount: selectedSeeds.size,
     seedHits: seedHits.size,
     seedSource: websiteSeeds.size
@@ -418,13 +508,72 @@ function reportBrandRows(location) {
     .sort((a, b) => b.volume - a.volume || a.brand.localeCompare(b.brand));
 }
 
-/** Compact, calculated facts for the AI strategic read. No raw keywords. */
-function reportFacts(report) {
+function reportVolumeShares(location) {
+  return {
+    branded: reportPercent(location.brandedVolume, location.reportedVolume),
+    intents: location.intentVolumes.map((volume) =>
+      reportPercent(volume, location.reportedVolume),
+    ),
+  };
+}
+
+/** @param {ReturnType<typeof reportReadLocation>} location */
+function reportOpportunities(location) {
+  const rules = [
+    { label: "Category leader", score: (row) => row.volume },
+    { label: "Highest bid", score: (row) => row.highBidInr ?? 0 },
+    {
+      label: "High bid below 1,000 searches",
+      score: (row) =>
+        row.volume < reportVolumeFloor ? (row.highBidInr ?? 0) : 0,
+    },
+    {
+      label: "High volume, low competition",
+      score: (row) => (row.quadrant === 1 ? row.volume : 0),
+    },
+    {
+      label: "Whitespace",
+      score: (row) => (row.quadrant === 3 ? row.volume : 0),
+    },
+    ...reportIntents.map(([label], index) => ({
+      label: `${label} intent`,
+      score: (row) => (row.intents.includes(index) ? row.volume : 0),
+    })),
+  ];
+  return rules.flatMap(({ label, score }) => {
+    let best;
+    let bestScore = 0;
+    for (const row of location.keywords.values()) {
+      const candidate = score(row);
+      if (candidate > bestScore) {
+        best = row;
+        bestScore = candidate;
+      }
+    }
+    return best ? [{ label, row: best }] : [];
+  });
+}
+
+function reportPeak(trend) {
+  return (
+    trend?.reduce(
+      (peak, point) =>
+        point.index !== null && (!peak || point.index > peak.index)
+          ? point
+          : peak,
+      null,
+    ) ?? null
+  );
+}
+
+/** Calculated facts and a limited set of keyword examples for the strategic read. */
+function reportFacts(report, selectedLocation) {
   const round = (value) =>
     value === null || value === undefined ? null : Number(value.toFixed(1));
   const home =
     report.locations.find((l) => reportNormalize(l.name) === "india") ??
     report.locations[0];
+  const focus = selectedLocation ?? home;
   const shares = (location) => ({
     brandedPct: report.brands.length
       ? round(reportPercent(location.branded, location.keywords.size))
@@ -439,7 +588,7 @@ function reportFacts(report) {
     ),
   });
   return {
-    note: "Search volumes are rounded by Google into buckets. Percentages use keyword counts. Brand volumes are sums of rounded values and only indicative.",
+    note: "Google rounds search volumes. Keyword shares use counts. Reported volume shares are indicative, use rounded values and can overlap for intent tags. Bids are INR estimates. Trend indices use a baseline of 100.",
     totals: {
       locations: report.locations.length,
       distinctKeywordsWithDemand: report.unique,
@@ -466,13 +615,63 @@ function reportFacts(report) {
         .map((m) => ({ month: m.label, index: round(m.index) })),
       seasonalityNote: home.seasonNote,
     },
-    topLocations: report.locations.slice(0, 12).map((location) => ({
-      name: location.name,
-      keywordsWithDemand: location.keywords.size,
-      peakVolume: location.maxVolume,
-      ...shares(location),
-      topBrand: reportBrandRows(location)[0]?.brand ?? null,
-    })),
+    keywordExamples: focus && {
+      location: focus.name,
+      examples: reportOpportunities(focus).map(({ label, row }) => ({
+        signal: label,
+        keyword: row.keyword.slice(0, 200),
+        searchVolume: row.volume,
+        competitionIndex: row.competition,
+        highBidInr: round(row.highBidInr),
+        monthly: row.monthly.slice(-12).flatMap((value, index, months) =>
+          value === null
+            ? []
+            : [
+                {
+                  month:
+                    focus.monthLabels[
+                      focus.monthLabels.length - months.length + index
+                    ],
+                  volume: value,
+                },
+              ],
+        ),
+      })),
+      brandPeakMonths: reportBrandRows(focus)
+        .slice(0, 8)
+        .flatMap(({ brand }) => {
+          const peak = reportPeak(focus.brandTrends.get(brand));
+          return peak
+            ? [
+                {
+                  brand,
+                  month: peak.label,
+                  index: round(peak.index),
+                  matchedKeywords: peak.pairs,
+                },
+              ]
+            : [];
+        }),
+    },
+    topLocations: report.locations.slice(0, 12).map((location) => {
+      const volumeShares = reportVolumeShares(location);
+      return {
+        name: location.name,
+        keywordsWithDemand: location.keywords.size,
+        peakVolume: location.maxVolume,
+        ...shares(location),
+        reportedVolumeShare: {
+          branded: report.brands.length ? round(volumeShares.branded) : null,
+          ...Object.fromEntries(
+            volumeShares.intents.map((share, i) => [
+              reportIntents[i][0],
+              round(share),
+            ]),
+          ),
+        },
+        topBrand: reportBrandRows(location)[0]?.brand ?? null,
+      };
+    }),
     locationsWithNoOrOneKeyword: report.locations
       .filter((location) => location.keywords.size <= 1)
       .map((location) => location.name),
@@ -482,6 +681,7 @@ function reportFacts(report) {
         city: location.name,
         state: location.cityState.name,
         medianCityToStateVolumePct: round(location.cityState.index),
+        matchedCityToStateVolumePct: round(location.cityState.volumeShare),
       })),
     brandsNotFoundInAnyLocation: report.absentBrands,
   };
@@ -558,9 +758,24 @@ function reportExportRows(report) {
     ]),
     [],
     [
+      "Location",
+      "Branded share of reported volume (%)",
+      ...reportIntents.map(([name]) => `${name} share of reported volume (%)`),
+    ],
+    ...report.locations.map((location) => {
+      const shares = reportVolumeShares(location);
+      return [
+        location.name,
+        report.brands.length ? fmt(shares.branded) : "",
+        ...shares.intents.map(fmt),
+      ];
+    }),
+    [],
+    [
       "City",
       "State",
       "Median city-to-state volume ratio (%)",
+      "City/state reported volume ratio on matched keywords (%)",
       "Matched keywords",
     ],
     ...report.locations
@@ -569,6 +784,7 @@ function reportExportRows(report) {
         location.name,
         location.cityState.name,
         fmt(location.cityState.index),
+        fmt(location.cityState.volumeShare),
         location.cityState.pairs,
       ]),
     ...(report.brands.length
@@ -580,15 +796,24 @@ function reportExportRows(report) {
             "Keywords",
             "Indicative volume",
             "Share of branded volume (%)",
+            "Peak month",
+            "Peak index",
+            "Baseline month",
           ],
           ...report.locations.flatMap((location) =>
-            reportBrandRows(location).map((row) => [
-              row.brand,
-              location.name,
-              row.keywords,
-              row.volume,
-              fmt(row.share),
-            ]),
+            reportBrandRows(location).map((row) => {
+              const peak = reportPeak(location.brandTrends.get(row.brand));
+              return [
+                row.brand,
+                location.name,
+                row.keywords,
+                row.volume,
+                fmt(row.share),
+                peak?.label,
+                peak ? fmt(peak.index) : "",
+                location.baselineLabel,
+              ];
+            }),
           ),
           [],
           ["Brands not found in any location"],
@@ -598,8 +823,30 @@ function reportExportRows(report) {
     [],
     [
       "Location",
+      "Opportunity",
+      "Keyword",
+      "Search volume",
+      "Competition index",
+      "Low bid (₹)",
+      "High bid (₹)",
+    ],
+    ...report.locations.flatMap((location) =>
+      reportOpportunities(location).map(({ label, row }) => [
+        location.name,
+        label,
+        row.keyword,
+        row.volume,
+        row.competition,
+        row.lowBidInr,
+        row.highBidInr,
+      ]),
+    ),
+    [],
+    [
+      "Location",
       "Month",
-      "Seasonality index (December 2025 = 100)",
+      "Seasonality index",
+      "Baseline month",
       "Matched keywords",
       "Coverage",
     ],
@@ -609,10 +856,11 @@ function reportExportRows(report) {
             location.name,
             month.label,
             fmt(month.index),
+            location.baselineLabel,
             month.pairs,
             location.seasonNote,
           ])
-        : [[location.name, "", "", 0, location.seasonNote]],
+        : [[location.name, "", "", "", 0, location.seasonNote]],
     ),
   ];
 }
@@ -620,6 +868,9 @@ function reportExportRows(report) {
 export {
   reportBuild,
   reportBrandRows,
+  reportVolumeShares,
+  reportOpportunities,
+  reportPeak,
   reportFacts,
   reportExportRows,
   reportSafeCsv,

@@ -29,11 +29,11 @@ If you configure `VITE_GOOGLE_SHEETS_API_KEY`, the public import uses the Google
 ## Configure optional AI tools in n8n
 
 1. Import `workflows/Keyword Report - n8n Analysis.json` as a new n8n workflow. It is inactive when imported.
-2. In **Analysis Webhook**, create or choose a Header Auth credential with header name `X-Report-Key` and a strong value. Share that value only with people who may run reports. Replace `https://YOUR-WEBSITE-ORIGIN` in the webhook's allowed origins with the exact origin of your website.
+2. The **Analysis Webhook** has no access key, so anyone who knows its URL can call it and use your OpenAI credits. Replace `https://YOUR-WEBSITE-ORIGIN` in the webhook's allowed origins with the exact website origin, and add the key check back (Header Auth `X-Report-Key`) if the URL is ever shared widely.
 3. Connect the existing Google Sheets OAuth credential to **List Sheet Tabs** and **Read Sheet Tabs**. That Google account needs access to the copied spreadsheet.
 4. To use optional brand detection, connect the existing OpenAI credential to **OpenAI Detect Brands**. Brand detection sends keywords to OpenAI and can incur API charges. The workflow allows up to 5,000 distinct keywords when it is enabled. It uses `gpt-4.1-mini`, which can be changed in that node.
 5. Publish the workflow. Set `VITE_ANALYSIS_WEBHOOK_URL` in your hosting service to the production HTTPS webhook URL and rebuild the website. For local development, place that variable in the gitignored `.env.local` file.
-6. In **Keyword report**, open **Optional AI tools** and enter the analysis access key. Choose **Detect brands and build report** for OpenAI brand detection or **Write strategic read** after a report is available. Review suggested brands before using them for decisions.
+6. In **Keyword report**, open **Optional AI tools**. Choose **Detect brands and build report** for OpenAI brand detection or **Write strategic read** after a report is available. Review suggested brands before using them for decisions.
 
 The workflow reads the standard location and input tabs. Use CSV import for custom location names. The analysis runs after the user starts it and the n8n webhook responds; large sheets and paid brand detection can hit execution, response-size, rate, or proxy timeout limits. Check the n8n execution before retrying after a timeout. The live n8n workflow and its completion behavior must be tested in your instance before relying on automatic handoff.
 
@@ -41,14 +41,22 @@ The workflow reads the standard location and input tabs. Use CSV import for cust
 
 1. Open each completed location tab in Sheets and choose **File → Download → Comma-separated values (.csv)**. Export one file per tab. For custom locations, name the CSV after its tab.
 2. Open **Keyword report**, expand **Or import CSV files**, and select the exports together. Include **Keyword input** for exact seed hit rates or **Website Input** if you use `kw:` brand seeds.
-3. Optionally enter comma-separated brand names. Brand matching uses that list. Intent tags use fixed phrases for price, comparison, doubt, recipes, and usage.
-4. Build the report. Select a location and click a competition quadrant to filter the keyword explorer.
+3. Optionally enter comma-separated brands. Use `Brand | alias | alias` to group spelling variants under one brand. Intent tags use fixed phrases for price, comparison, doubt, recipes, and usage.
+4. Build the report and select a location. Select a keyword to see its monthly trend, or rank the explorer by bid to find expensive terms. Expand the regional comparison to see shares of reported volume and city versus state ratios for matched keywords.
 5. Download the summary or keyword details as CSV. In your original Google Sheet, use **File → Import → Upload** and choose **Insert new sheet(s)**.
 
-The report processes the CSVs in the browser. It uses distinct positive-volume keywords, counts volume tiers, and uses 1,000 search volume and 50 competition index as the quadrant thresholds. Google rounds search volumes, so the report shows volume buckets and peak values. Seasonality uses the median keyword-level ratio to December 2025 where dated month columns exist. City/state comparisons use keywords found with positive volume in both exported tabs.
+The report processes the CSVs in the browser. It uses distinct positive-volume keywords, counts volume tiers, and uses 1,000 search volume and 50 competition index as the quadrant thresholds. Volume shares use Google's rounded figures and can overlap for intent tags. Location and brand trends use the median keyword-level ratio to December 2025, or the earliest dated column when December 2025 is absent. City/state comparisons use keywords found with positive volume in both exported tabs.
+
+Bid amounts appear in rupees in the report and CSV. For plain `Low bid` and `High bid` headers, the report reads fractional or ₹-prefixed bids as a sign that both columns use rupees. With whole numbers only, it defaults to raw Google Ads micros. Use `Low bid (₹)` and `High bid (₹)` to specify rupees, or add `(micros)` to specify raw micros.
 
 ## Brand breakdown and strategic read
 
-- With a brand list, each location shows a table of brands (keywords, indicative volume, share of branded volume). Brands that appear in no location are listed under the table and in the CSV download. Volumes add up Google's rounded values, so they are a guide only.
-- **Write strategic read** sends the calculated summary (no raw keywords) to the analysis workflow, which asks OpenAI (`gpt-4.1-mini`) for 8–12 observation and hypothesis pairs. They are labelled as AI hypotheses; the numbers in them should be checked against the tables. It may incur API charges and only runs when the button is pressed.
+- With a brand list, each location shows a brand breakdown, monthly trends, and peak months. Brands that appear in no location are listed under the table and in the CSV download.
+- **Write strategic read** sends calculated figures and up to 10 keyword examples for the selected location to the analysis workflow. It asks OpenAI (`gpt-4.1-mini`) for 8–12 observation and hypothesis pairs and may incur API charges when the button is pressed.
 - After importing the updated workflow, connect your OpenAI credential to both **OpenAI Detect Brands** and **OpenAI Strategic Read**.
+
+For reports opened directly from Sheets, **Save new Summary tab** is available with `VITE_GOOGLE_CLIENT_ID` configured. Enable the Sheets write scope (`https://www.googleapis.com/auth/spreadsheets`) for the OAuth app. Sign in as an editor when saving. The report creates a new tab with the Summary CSV data in the source workbook.
+
+## Export for Claude Code
+
+**Export for Claude Code** (report header) downloads one ZIP with everything in the report: `README_FOR_CLAUDE_CODE.md` (source, column guide, rules, calculated headline numbers, next steps), `keywords_all_locations.csv` (every keyword in every location with bids in rupees, tags and monthly volumes), `locations_summary.csv`, `brands_by_location.csv` (when a brand list was supplied), `facts.json`, and `strategic_read.md` (only if the AI read was generated). Nothing is sent anywhere; the ZIP is built in the browser.

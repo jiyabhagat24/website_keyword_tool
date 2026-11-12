@@ -1,6 +1,7 @@
 import { LOCATIONS } from "./config";
 
 const sheetsReadScope = "https://www.googleapis.com/auth/spreadsheets.readonly";
+const sheetsWriteScope = "https://www.googleapis.com/auth/spreadsheets";
 const publicApiKey = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY?.trim();
 const oauthClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
 const locations = new Set(LOCATIONS.map((name) => name.toLowerCase()));
@@ -49,7 +50,7 @@ export function loadGoogleIdentity(): Promise<void> {
   return identityScript;
 }
 
-async function requestReadToken(): Promise<string> {
+async function requestSheetsToken(scope: string): Promise<string> {
   if (!oauthClientId)
     throw new Error("Google sign-in is not configured for this website.");
   if (!window.google?.accounts?.oauth2) await loadGoogleIdentity();
@@ -59,16 +60,83 @@ async function requestReadToken(): Promise<string> {
     oauth
       .initTokenClient({
         client_id: oauthClientId,
-        scope: sheetsReadScope,
+        scope,
         callback: ({ access_token }) => {
           if (access_token) resolve(access_token);
-          else reject(new Error("Google did not grant read access to Sheets."));
+          else
+            reject(
+              new Error("Google did not grant the requested Sheets access."),
+            );
         },
         error_callback: () =>
           reject(new Error("Google sign-in was closed or blocked. Try again.")),
       })
       .requestAccessToken();
   });
+}
+
+export async function saveKeywordSummary(
+  spreadsheetId: string,
+  rows: (string | number | null | undefined)[][],
+): Promise<string> {
+  const token = await requestSheetsToken(sheetsWriteScope);
+  const sheetId =
+    (crypto.getRandomValues(new Uint32Array(1))[0] % 2_000_000_000) + 1;
+  const title = `Keyword Summary ${new Date().toISOString().slice(0, 10)} ${sheetId.toString(36)}`;
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({
+        requests: [
+          {
+            addSheet: {
+              properties: {
+                sheetId,
+                title,
+                gridProperties: {
+                  rowCount: rows.length,
+                  columnCount: Math.max(...rows.map((row) => row.length)),
+                },
+              },
+            },
+          },
+          {
+            updateCells: {
+              start: { sheetId, rowIndex: 0, columnIndex: 0 },
+              fields: "userEnteredValue",
+              rows: rows.map((row) => ({
+                values: row.map((value) =>
+                  value == null
+                    ? {}
+                    : {
+                        userEnteredValue:
+                          typeof value === "number"
+                            ? { numberValue: value }
+                            : { stringValue: value },
+                      },
+                ),
+              })),
+            },
+          },
+        ],
+      }),
+    },
+  );
+  if (response.status === 401 || response.status === 403)
+    throw new Error(
+      "Google could not save the summary. Use a Google account with Editor access.",
+    );
+  if (!response.ok)
+    throw new Error(
+      `Google Sheets returned HTTP ${response.status}. Check the Sheet or download the Summary CSV.`,
+    );
+  return `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/edit#gid=${sheetId}`;
 }
 
 export function sheetIdFromInput(value: string): string | null {
@@ -137,7 +205,9 @@ export async function readGoogleSheet(
   signedIn: boolean,
 ): Promise<{ name: string; text: string }[]> {
   if (!signedIn && !publicApiKey) return readPublicWorkbook(sheetId);
-  const token = signedIn ? await requestReadToken() : undefined;
+  const token = signedIn
+    ? await requestSheetsToken(sheetsReadScope)
+    : undefined;
 
   const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}`;
   const signal = AbortSignal.timeout(120_000);
