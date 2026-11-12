@@ -69,14 +69,8 @@ import {
   NativeSelectOption,
 } from "@/components/watermelon/native-select";
 import { WEBHOOKS, SHEETS, LOCATIONS, MONTHS } from "./config";
-import {
-  googleSignInConfigured,
-  loadGoogleIdentity,
-  readGoogleSheet,
-  saveKeywordSummary,
-  sheetIdFromInput,
-} from "./google-sheets";
-import { runAnalysisWorkflow, requestStrategicRead } from "./analysis-workflow";
+import { readGoogleSheet, sheetIdFromInput } from "./google-sheets";
+import { requestStrategicRead } from "./analysis-workflow";
 import type { StrategicRead } from "./analysis-workflow";
 import { buildClaudeBundle } from "./claude-bundle";
 import {
@@ -624,14 +618,10 @@ function Reports({
   sheet: string;
   setSheet: (value: string) => void;
 }) {
-  const [brandsDetected, setBrandsDetected] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const [reportSheetId, setReportSheetId] = useState<string>();
-  const [savingSummary, setSavingSummary] = useState(false);
-  const [summaryLink, setSummaryLink] = useState("");
-  const [summaryError, setSummaryError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -646,11 +636,7 @@ function Reports({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
-  const aiSettingsRef = useRef<HTMLDetailsElement>(null);
   const keywordTrendRef = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    void loadGoogleIdentity().catch(() => {});
-  }, []);
   const location = report?.locations[locationIndex];
   const opportunities = useMemo(
     () => (location ? reportOpportunities(location) : []),
@@ -722,28 +708,8 @@ function Reports({
     setAiRead(null);
     setAiMessage("");
     setReportSheetId(sourceSheetId);
-    setSummaryLink("");
-    setSummaryError("");
     setReport(result);
     requestAnimationFrame(() => resultsRef.current?.focus());
-  }
-  async function saveSummary() {
-    if (!report || !reportSheetId || savingSummary) return;
-    setSavingSummary(true);
-    setSummaryError("");
-    try {
-      setSummaryLink(
-        await saveKeywordSummary(reportSheetId, reportExportRows(report)),
-      );
-    } catch (error) {
-      setSummaryError(
-        error instanceof Error
-          ? error.message
-          : "The summary could not be saved.",
-      );
-    } finally {
-      setSavingSummary(false);
-    }
   }
   async function writeStrategicRead() {
     if (!report) return;
@@ -759,7 +725,7 @@ function Reports({
       setAiBusy(false);
     }
   }
-  async function buildSheet(source: "public" | "private" | "ai") {
+  async function buildSheet() {
     const id = sheetIdFromInput(sheet);
     if (!id) {
       setMessage("Paste a valid Google Sheet link or ID.");
@@ -768,23 +734,8 @@ function Reports({
     setBusy(true);
     setMessage("");
     setReport(null);
-    setBrandsDetected(false);
     try {
-      if (source === "ai") {
-        const result = await runAnalysisWorkflow(id, true);
-        const brandList = [brands.trim(), ...result.brands]
-          .filter(Boolean)
-          .join(", ");
-        setBrands(brandList);
-        setBrandsDetected(result.detected);
-        applySources(result.sources, brandList, id);
-      } else {
-        applySources(
-          await readGoogleSheet(id, source === "private"),
-          brands,
-          id,
-        );
-      }
+      applySources(await readGoogleSheet(id), brands, id);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Could not read the sheet.",
@@ -902,51 +853,18 @@ function Reports({
                   Separate brands with commas. Add aliases with |, for example
                   Dot &amp; Key | dot and key | dot andkey.
                 </p>
-                {brandsDetected && (
-                  <p>
-                    Review the detected names. Edit the list and rebuild the
-                    report to use your corrections.
-                  </p>
-                )}
               </div>
               <div className="sheet-report-actions">
                 <Button
                   type="button"
-                  onClick={() => buildSheet("public")}
-                  disabled={busy || aiBusy || savingSummary}
+                  onClick={() => buildSheet()}
+                  disabled={busy || aiBusy}
                 >
                   {busy ? <Loader2 className="spinner" /> : <ArrowRight />}
                   {busy ? "Reading Sheet" : "Build report from public Sheet"}
                 </Button>
-                {googleSignInConfigured && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => buildSheet("private")}
-                    disabled={busy || aiBusy || savingSummary}
-                  >
-                    Sign in with Google
-                  </Button>
-                )}
               </div>
             </div>
-            <details className="csv-alternative" ref={aiSettingsRef}>
-              <summary>Optional AI tools</summary>
-              <div className="report-form">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => buildSheet("ai")}
-                  disabled={busy || aiBusy || savingSummary}
-                >
-                  <Sparkles /> Detect brands and build report
-                </Button>
-                <p>
-                  Brand detection sends up to 5,000 distinct keywords to OpenAI
-                  and may use paid API credits.
-                </p>
-              </div>
-            </details>
             <details className="csv-alternative">
               <summary>Or import CSV files</summary>
               <form onSubmit={build} className="report-form">
@@ -1088,41 +1006,8 @@ function Reports({
               >
                 Export for Claude Code
               </DownloadButton>
-              {reportSheetId &&
-                googleSignInConfigured &&
-                (summaryLink ? (
-                  <Button variant="outline" asChild>
-                    <a
-                      href={summaryLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open saved Summary tab <ArrowUpRight />
-                    </a>
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={saveSummary}
-                    disabled={savingSummary}
-                  >
-                    {savingSummary ? (
-                      <Loader2 className="spinner" />
-                    ) : (
-                      <FileSpreadsheet />
-                    )}
-                    {savingSummary ? "Saving summary" : "Save new Summary tab"}
-                  </Button>
-                ))}
             </div>
           </div>
-          {summaryError && (
-            <Alert variant="destructive">
-              <AlertTitle>Could not save the summary</AlertTitle>
-              <AlertDescription>{summaryError}</AlertDescription>
-            </Alert>
-          )}
           <div className="metric-grid">
             <Card>
               <CardContent>
