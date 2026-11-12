@@ -81,7 +81,7 @@ export interface StrategicRead {
   model: string;
 }
 
-/** Sends calculated facts (never raw keywords) and gets AI hypotheses back. */
+/** Sends calculated facts and selected keyword examples for AI hypotheses. */
 export async function requestStrategicRead(
   facts: unknown,
   accessKey: string,

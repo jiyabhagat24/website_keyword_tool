@@ -866,6 +866,13 @@ pre {
   outline: 2px solid currentColor;
   outline-offset: -2px;
 }
+.keyword-trend-link {
+  color: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
 .tiers {
   margin-top: 27px;
 }

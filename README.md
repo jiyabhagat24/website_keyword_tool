@@ -41,16 +41,22 @@ The workflow reads the standard location and input tabs. Use CSV import for cust
 
 1. Open each completed location tab in Sheets and choose **File → Download → Comma-separated values (.csv)**. Export one file per tab. For custom locations, name the CSV after its tab.
 2. Open **Keyword report**, expand **Or import CSV files**, and select the exports together. Include **Keyword input** for exact seed hit rates or **Website Input** if you use `kw:` brand seeds.
-3. Optionally enter comma-separated brand names. Brand matching uses that list. Intent tags use fixed phrases for price, comparison, doubt, recipes, and usage.
-4. Build the report. Select a location and click a competition quadrant to filter the keyword explorer.
+3. Optionally enter comma-separated brands. Use `Brand | alias | alias` to group spelling variants under one brand. Intent tags use fixed phrases for price, comparison, doubt, recipes, and usage.
+4. Build the report and select a location. Select a keyword to see its monthly trend, or rank the explorer by bid to find expensive terms. Expand the regional comparison to see shares of reported volume and city versus state ratios for matched keywords.
 5. Download the summary or keyword details as CSV. In your original Google Sheet, use **File → Import → Upload** and choose **Insert new sheet(s)**.
 
-The report processes the CSVs in the browser. It uses distinct positive-volume keywords, counts volume tiers, and uses 1,000 search volume and 50 competition index as the quadrant thresholds. Google rounds search volumes, so the report shows volume buckets and peak values. Seasonality uses the median keyword-level ratio to December 2025 where dated month columns exist. City/state comparisons use keywords found with positive volume in both exported tabs.
+The report processes the CSVs in the browser. It uses distinct positive-volume keywords, counts volume tiers, and uses 1,000 search volume and 50 competition index as the quadrant thresholds. Volume shares use Google's rounded figures and can overlap for intent tags. Location and brand trends use the median keyword-level ratio to December 2025, or the earliest dated column when December 2025 is absent. City/state comparisons use keywords found with positive volume in both exported tabs.
 
 Bid amounts appear in rupees in the report and CSV. For plain `Low bid` and `High bid` headers, the report reads fractional or ₹-prefixed bids as a sign that both columns use rupees. With whole numbers only, it defaults to raw Google Ads micros. Use `Low bid (₹)` and `High bid (₹)` to specify rupees, or add `(micros)` to specify raw micros.
 
 ## Brand breakdown and strategic read
 
-- With a brand list, each location shows a table of brands (keywords, indicative volume, share of branded volume). Brands that appear in no location are listed under the table and in the CSV download. Volumes add up Google's rounded values, so they are a guide only.
-- **Write strategic read** sends the calculated summary (no raw keywords) to the analysis workflow, which asks OpenAI (`gpt-4.1-mini`) for 8–12 observation and hypothesis pairs. They are labelled as AI hypotheses; the numbers in them should be checked against the tables. It may incur API charges and only runs when the button is pressed.
+- With a brand list, each location shows a brand breakdown, monthly trends, and peak months. Brands that appear in no location are listed under the table and in the CSV download.
+- **Write strategic read** sends calculated figures and up to 10 keyword examples for the selected location to the analysis workflow. It asks OpenAI (`gpt-4.1-mini`) for 8–12 observation and hypothesis pairs and may incur API charges when the button is pressed.
 - After importing the updated workflow, connect your OpenAI credential to both **OpenAI Detect Brands** and **OpenAI Strategic Read**.
+
+For reports opened directly from Sheets, **Save new Summary tab** is available with `VITE_GOOGLE_CLIENT_ID` configured. Enable the Sheets write scope (`https://www.googleapis.com/auth/spreadsheets`) for the OAuth app. Sign in as an editor when saving. The report creates a new tab with the Summary CSV data in the source workbook.
+
+## Export for Claude Code
+
+**Export for Claude Code** (report header) downloads one ZIP with everything in the report: `README_FOR_CLAUDE_CODE.md` (source, column guide, rules, calculated headline numbers, next steps), `keywords_all_locations.csv` (every keyword in every location with bids in rupees, tags and monthly volumes), `locations_summary.csv`, `brands_by_location.csv` (when a brand list was supplied), `facts.json`, and `strategic_read.md` (only if the AI read was generated). Nothing is sent anywhere; the ZIP is built in the browser.

@@ -73,13 +73,18 @@ import {
   googleSignInConfigured,
   loadGoogleIdentity,
   readGoogleSheet,
+  saveKeywordSummary,
   sheetIdFromInput,
 } from "./google-sheets";
 import { runAnalysisWorkflow, requestStrategicRead } from "./analysis-workflow";
 import type { StrategicRead } from "./analysis-workflow";
+import { buildClaudeBundle } from "./claude-bundle";
 import {
   reportBuild,
   reportBrandRows,
+  reportVolumeShares,
+  reportOpportunities,
+  reportPeak,
   reportFacts,
   reportExportRows,
   reportSafeCsv,
@@ -95,6 +100,8 @@ type Mode = "website" | "keywords";
 type Report = ReturnType<typeof reportBuild>;
 const format = (value: number | null) =>
   value === null ? "—" : reportNumber.format(value);
+const formatPercent = (value: number | null) =>
+  value === null ? "—" : `${format(value)}%`;
 const formatBid = (rupees: number | null) =>
   rupees === null
     ? "—"
@@ -162,6 +169,21 @@ function downloadCsv(name: string, rows: unknown[][]) {
     new Blob(["\uFEFF", reportSafeCsv(rows)], {
       type: "text/csv;charset=utf-8",
     }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadClaudeBundle(
+  report: Parameters<typeof buildClaudeBundle>[0],
+  options: Parameters<typeof buildClaudeBundle>[1],
+) {
+  const { name, bytes } = buildClaudeBundle(report, options);
+  const url = URL.createObjectURL(
+    new Blob([bytes], { type: "application/zip" }),
   );
   const link = document.createElement("a");
   link.href = url;
@@ -607,22 +629,45 @@ function Reports({
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
   const [report, setReport] = useState<Report | null>(null);
+  const [reportSheetId, setReportSheetId] = useState<string>();
+  const [savingSummary, setSavingSummary] = useState(false);
+  const [summaryLink, setSummaryLink] = useState("");
+  const [summaryError, setSummaryError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [dragging, setDragging] = useState(false);
   const [locationIndex, setLocationIndex] = useState(0);
   const [quadrant, setQuadrant] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [bidRanking, setBidRanking] = useState("volume");
+  const [trendKeyword, setTrendKeyword] = useState("");
+  const [trendBrand, setTrendBrand] = useState("");
   const [page, setPage] = useState(0);
   const [aiRead, setAiRead] = useState<StrategicRead | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
   const aiSettingsRef = useRef<HTMLDetailsElement>(null);
+  const keywordTrendRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     void loadGoogleIdentity().catch(() => {});
   }, []);
   const location = report?.locations[locationIndex];
+  const opportunities = useMemo(
+    () => (location ? reportOpportunities(location) : []),
+    [location],
+  );
+  const brandRows = useMemo(
+    () => (location ? reportBrandRows(location) : []),
+    [location],
+  );
+  const selectedBrand = trendBrand || brandRows[0]?.brand;
+  const brandTrend = selectedBrand
+    ? location?.brandTrends.get(selectedBrand)
+    : undefined;
+  const brandPeak = reportPeak(brandTrend);
+  const keywordTrend =
+    location?.keywords.get(trendKeyword) ?? opportunities[0]?.row;
   const visibleQuadrants = location?.quadrants.at(-1)
     ? reportQuadrants
     : reportQuadrants.slice(0, -1);
@@ -633,19 +678,32 @@ function Reports({
             .filter(
               ([key, row]) =>
                 key.includes(reportNormalize(search)) &&
-                (quadrant === null || row.quadrant === quadrant),
+                (quadrant === null || row.quadrant === quadrant) &&
+                (bidRanking === "volume" ||
+                  (row.highBidInr !== null &&
+                    row.highBidInr > 0 &&
+                    (bidRanking !== "low-volume-bid" || row.volume < 1000))),
             )
             .map(([, row]) => row)
             .sort(
               (a, b) =>
-                b.volume - a.volume || a.keyword.localeCompare(b.keyword),
+                (bidRanking === "volume"
+                  ? 0
+                  : (b.highBidInr ?? 0) - (a.highBidInr ?? 0)) ||
+                b.volume - a.volume ||
+                a.keyword.localeCompare(b.keyword),
             )
         : [],
-    [location, search, quadrant],
+    [location, search, quadrant, bidRanking],
   );
+  function showKeywordTrend(keyword: string) {
+    setTrendKeyword(reportNormalize(keyword));
+    requestAnimationFrame(() => keywordTrendRef.current?.focus());
+  }
   function applySources(
     sources: { name: string; text?: string; error?: string }[],
     brandList = brands,
+    sourceSheetId?: string,
   ) {
     const result = reportBuild(sources, brandList);
     setMessage(result.errors.join("\n"));
@@ -658,11 +716,35 @@ function Reports({
     setLocationIndex(0);
     setQuadrant(null);
     setSearch("");
+    setBidRanking("volume");
+    setTrendKeyword("");
+    setTrendBrand("");
     setPage(0);
     setAiRead(null);
     setAiMessage("");
+    setReportSheetId(sourceSheetId);
+    setSummaryLink("");
+    setSummaryError("");
     setReport(result);
     requestAnimationFrame(() => resultsRef.current?.focus());
+  }
+  async function saveSummary() {
+    if (!report || !reportSheetId || savingSummary) return;
+    setSavingSummary(true);
+    setSummaryError("");
+    try {
+      setSummaryLink(
+        await saveKeywordSummary(reportSheetId, reportExportRows(report)),
+      );
+    } catch (error) {
+      setSummaryError(
+        error instanceof Error
+          ? error.message
+          : "The summary could not be saved.",
+      );
+    } finally {
+      setSavingSummary(false);
+    }
   }
   async function writeStrategicRead() {
     if (!report) return;
@@ -677,7 +759,9 @@ function Reports({
     setAiBusy(true);
     setAiMessage("");
     try {
-      setAiRead(await requestStrategicRead(reportFacts(report), accessKey));
+      setAiRead(
+        await requestStrategicRead(reportFacts(report, location), accessKey),
+      );
     } catch (error) {
       setAiMessage(
         error instanceof Error ? error.message : "The strategic read failed.",
@@ -708,9 +792,13 @@ function Reports({
           .join(", ");
         setBrands(brandList);
         setBrandsDetected(result.detected);
-        applySources(result.sources, brandList);
+        applySources(result.sources, brandList, id);
       } else {
-        applySources(await readGoogleSheet(id, source === "private"));
+        applySources(
+          await readGoogleSheet(id, source === "private"),
+          brands,
+          id,
+        );
       }
     } catch (error) {
       setMessage(
@@ -767,6 +855,7 @@ function Reports({
         "Quadrant",
         "Brand",
         "Intent tags",
+        ...(location?.monthLabels ?? []),
       ],
       ...matching.map((row) => [
         row.keyword,
@@ -778,6 +867,7 @@ function Reports({
         reportQuadrants[row.quadrant],
         row.brand,
         row.intents.map((i: number) => reportIntents[i][0]).join(", "),
+        ...row.monthly,
       ]),
     ]);
   return (
@@ -823,6 +913,10 @@ function Reports({
                   placeholder="Philips, Agaro, Prestige"
                   maxLength={4000}
                 />
+                <p>
+                  Separate brands with commas. Add aliases with |, for example
+                  Dot &amp; Key | dot and key | dot andkey.
+                </p>
                 {brandsDetected && (
                   <p>
                     Review the detected names. Edit the list and rebuild the
@@ -834,7 +928,7 @@ function Reports({
                 <Button
                   type="button"
                   onClick={() => buildSheet("public")}
-                  disabled={busy || aiBusy}
+                  disabled={busy || aiBusy || savingSummary}
                 >
                   {busy ? <Loader2 className="spinner" /> : <ArrowRight />}
                   {busy ? "Reading Sheet" : "Build report from public Sheet"}
@@ -844,7 +938,7 @@ function Reports({
                     type="button"
                     variant="outline"
                     onClick={() => buildSheet("private")}
-                    disabled={busy || aiBusy}
+                    disabled={busy || aiBusy || savingSummary}
                   >
                     Sign in with Google
                   </Button>
@@ -871,7 +965,7 @@ function Reports({
                   type="button"
                   variant="outline"
                   onClick={() => buildSheet("ai")}
-                  disabled={busy || aiBusy}
+                  disabled={busy || aiBusy || savingSummary}
                 >
                   <Sparkles /> Detect brands and build report
                 </Button>
@@ -956,10 +1050,7 @@ function Reports({
                     placeholder="Philips, Agaro, Prestige"
                     maxLength={4000}
                   />
-                  <p>
-                    Separate names with commas to distinguish branded and
-                    generic keywords.
-                  </p>
+                  <p>Separate brands with commas and add aliases with |.</p>
                 </div>
                 <div className="form-bottom">
                   <span>
@@ -1007,14 +1098,59 @@ function Reports({
               </h2>
               <p>Google rounds search volumes. Compare tiers and buckets.</p>
             </div>
-            <DownloadButton
-              onClick={() =>
-                downloadCsv("Keyword Summary.csv", reportExportRows(report))
-              }
-            >
-              Summary CSV
-            </DownloadButton>
+            <div className="sheet-report-actions">
+              <DownloadButton
+                onClick={() =>
+                  downloadCsv("Keyword Summary.csv", reportExportRows(report))
+                }
+              >
+                Summary CSV
+              </DownloadButton>
+              <DownloadButton
+                onClick={() =>
+                  downloadClaudeBundle(report, {
+                    sheetId: reportSheetId,
+                    strategicRead: aiRead,
+                  })
+                }
+              >
+                Export for Claude Code
+              </DownloadButton>
+              {reportSheetId &&
+                googleSignInConfigured &&
+                (summaryLink ? (
+                  <Button variant="outline" asChild>
+                    <a
+                      href={summaryLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open saved Summary tab <ArrowUpRight />
+                    </a>
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={saveSummary}
+                    disabled={savingSummary}
+                  >
+                    {savingSummary ? (
+                      <Loader2 className="spinner" />
+                    ) : (
+                      <FileSpreadsheet />
+                    )}
+                    {savingSummary ? "Saving summary" : "Save new Summary tab"}
+                  </Button>
+                ))}
+            </div>
           </div>
+          {summaryError && (
+            <Alert variant="destructive">
+              <AlertTitle>Could not save the summary</AlertTitle>
+              <AlertDescription>{summaryError}</AlertDescription>
+            </Alert>
+          )}
           <div className="metric-grid">
             <Card>
               <CardContent>
@@ -1083,6 +1219,36 @@ function Reports({
                   report.seedCount ? item.seedHits : "—",
                 ])}
               />
+              <details className="csv-alternative">
+                <summary>Compare reported volume by region</summary>
+                <p className="helper">
+                  Shares use Google's rounded volumes. Intent groups can
+                  overlap. City and state ratios use only keywords with demand
+                  in both locations.
+                </p>
+                <DataTable
+                  label="Regional volume shares"
+                  headers={[
+                    "Location",
+                    "Branded",
+                    ...reportIntents.map(([name]) => name),
+                    "City vs. state",
+                  ]}
+                  rows={report.locations.map((item) => {
+                    const shares = reportVolumeShares(item);
+                    return [
+                      item.name,
+                      report.brands.length
+                        ? formatPercent(shares.branded)
+                        : "—",
+                      ...shares.intents.map(formatPercent),
+                      item.cityState
+                        ? `${formatPercent(item.cityState.volumeShare)} of ${item.cityState.name}`
+                        : "—",
+                    ];
+                  })}
+                />
+              </details>
             </CardContent>
           </Card>
           <Card>
@@ -1104,6 +1270,8 @@ function Reports({
                       setQuadrant(null);
                       setSearch("");
                       setPage(0);
+                      setTrendKeyword("");
+                      setTrendBrand("");
                     }}
                   >
                     {report.locations.map((item, i) => (
@@ -1143,10 +1311,38 @@ function Reports({
                   estimates.
                 </p>
               </div>
+              {opportunities.length > 0 && (
+                <div className="brand-breakdown">
+                  <h3>Keywords to investigate in {location.name}</h3>
+                  <DataTable
+                    label="Keyword opportunities"
+                    headers={[
+                      "Signal",
+                      "Keyword",
+                      "Search volume",
+                      "Competition",
+                      "High bid (₹)",
+                    ]}
+                    rows={opportunities.map(({ label, row }) => [
+                      label,
+                      <button
+                        type="button"
+                        className="keyword-trend-link"
+                        onClick={() => showKeywordTrend(row.keyword)}
+                      >
+                        {row.keyword}
+                      </button>,
+                      format(row.volume),
+                      format(row.competition),
+                      formatBid(row.highBidInr),
+                    ])}
+                  />
+                </div>
+              )}
               {report.brands.length > 0 && (
                 <div className="brand-breakdown">
                   <h3>Brands in {location.name}</h3>
-                  {reportBrandRows(location).length ? (
+                  {brandRows.length ? (
                     <table>
                       <thead>
                         <tr>
@@ -1157,16 +1353,14 @@ function Reports({
                         </tr>
                       </thead>
                       <tbody>
-                        {reportBrandRows(location)
-                          .slice(0, 15)
-                          .map((row) => (
-                            <tr key={row.brand}>
-                              <td>{row.brand}</td>
-                              <td>{format(row.keywords)}</td>
-                              <td>{format(row.volume)}</td>
-                              <td>{format(row.share)}%</td>
-                            </tr>
-                          ))}
+                        {brandRows.slice(0, 15).map((row) => (
+                          <tr key={row.brand}>
+                            <td>{row.brand}</td>
+                            <td>{format(row.keywords)}</td>
+                            <td>{format(row.volume)}</td>
+                            <td>{format(row.share)}%</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   ) : (
@@ -1182,14 +1376,48 @@ function Reports({
                         report.absentBrands.join(", ") +
                         "."}
                   </p>
+                  {brandTrend?.length ? (
+                    <details className="csv-alternative">
+                      <summary>Monthly brand trends</summary>
+                      <div className="field">
+                        <Label htmlFor="trend-brand">Brand</Label>
+                        <NativeSelect
+                          id="trend-brand"
+                          value={selectedBrand}
+                          onChange={(event) =>
+                            setTrendBrand(event.target.value)
+                          }
+                        >
+                          {brandRows.map(({ brand }) => (
+                            <NativeSelectOption key={brand} value={brand}>
+                              {brand}
+                            </NativeSelectOption>
+                          ))}
+                        </NativeSelect>
+                      </div>
+                      <p className="helper">
+                        {location.baselineLabel} = 100.{" "}
+                        {brandPeak &&
+                          `Peak in ${brandPeak.label} at ${format(brandPeak.index)}.`}
+                      </p>
+                      <DataTable
+                        label="Monthly brand trends"
+                        headers={["Month", "Index", "Matched keywords"]}
+                        rows={brandTrend.map((month) => [
+                          month.label,
+                          format(month.index),
+                          month.pairs,
+                        ])}
+                      />
+                    </details>
+                  ) : null}
                 </div>
               )}
               <div className="ai-read">
                 <h3>Strategic read (AI)</h3>
                 <p className="helper">
-                  Sends only the calculated summary above, not your keywords, to
-                  OpenAI. It may incur API charges. The result is a set of
-                  hypotheses, not facts from the data.
+                  Sends the summary and the keyword examples for {location.name}{" "}
+                  to OpenAI to generate hypotheses. This may incur API charges.
                 </p>
                 <Button
                   type="button"
@@ -1336,6 +1564,24 @@ function Reports({
                     placeholder="Find a keyword in this location"
                   />
                 </div>
+                <NativeSelect
+                  aria-label="Rank keywords"
+                  value={bidRanking}
+                  onChange={(event) => {
+                    setBidRanking(event.target.value);
+                    setPage(0);
+                  }}
+                >
+                  <NativeSelectOption value="volume">
+                    Highest search volume
+                  </NativeSelectOption>
+                  <NativeSelectOption value="bid">
+                    Highest bid
+                  </NativeSelectOption>
+                  <NativeSelectOption value="low-volume-bid">
+                    Highest bid under 1,000 searches
+                  </NativeSelectOption>
+                </NativeSelect>
                 {quadrant !== null && (
                   <Button
                     variant="secondary"
@@ -1366,7 +1612,13 @@ function Reports({
                   rows={matching
                     .slice(page * 50, (page + 1) * 50)
                     .map((row) => [
-                      row.keyword,
+                      <button
+                        type="button"
+                        className="keyword-trend-link"
+                        onClick={() => showKeywordTrend(row.keyword)}
+                      >
+                        {row.keyword}
+                      </button>,
                       format(row.volume),
                       format(row.competition),
                       formatBid(row.lowBidInr),
@@ -1418,12 +1670,43 @@ function Reports({
               </div>
             </CardContent>
           </Card>
+          {keywordTrend && (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  <span ref={keywordTrendRef} tabIndex={-1}>
+                    Monthly trend for {keywordTrend.keyword}
+                  </span>
+                </CardTitle>
+                <CardDescription>
+                  {location.name} · Select a keyword to see its monthly search
+                  volume.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {keywordTrend.monthly.some((value) => value !== null) ? (
+                  <DataTable
+                    label="Monthly keyword trend"
+                    headers={["Month", "Search volume"]}
+                    rows={location.monthLabels.map((month, index) => [
+                      month,
+                      format(keywordTrend.monthly[index]),
+                    ])}
+                  />
+                ) : (
+                  <p className="helper">
+                    This keyword has no monthly data in the Sheet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Seasonality</CardTitle>
               <CardDescription>
                 {location.seasonNote ||
-                  "Median per-keyword ratio, with December 2025 set to 100."}
+                  `Median per-keyword ratio, with ${location.baselineLabel} set to 100.`}
               </CardDescription>
             </CardHeader>
             <CardContent>
