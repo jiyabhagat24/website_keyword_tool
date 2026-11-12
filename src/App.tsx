@@ -1,5 +1,6 @@
 import tbmLogo from "./assets/tbm-logo.png";
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -68,7 +69,11 @@ import {
   NativeSelectOption,
 } from "@/components/watermelon/native-select";
 import { WEBHOOKS, SHEETS, LOCATIONS, MONTHS } from "./config";
-import { sheetIdFromInput } from "./google-sheets";
+import {
+  loadGoogleIdentity,
+  readGoogleSheet,
+  sheetIdFromInput,
+} from "./google-sheets";
 import { runAnalysisWorkflow, requestStrategicRead } from "./analysis-workflow";
 import type { StrategicRead } from "./analysis-workflow";
 import {
@@ -169,7 +174,7 @@ function Guide({ report = false }: { report?: boolean }) {
     ? [
         [
           "Connect your sheet",
-          "Paste the sheet link and enter the access key for your analysis workflow.",
+          "Paste a public Sheet link or sign in with Google to read a private Sheet you can access.",
         ],
         [
           "Choose brand names",
@@ -246,13 +251,15 @@ function Collection({
   const [locations, setLocations] = useState<string[]>([]);
   const [custom, setCustom] = useState(false);
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-  const [dates, setDates] = useState({
+  const start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const defaultDates = {
     startMonth: MONTHS[start.getMonth()],
     startYear: start.getFullYear(),
-    endMonth: MONTHS[now.getMonth()],
-    endYear: now.getFullYear(),
-  });
+    endMonth: MONTHS[end.getMonth()],
+    endYear: end.getFullYear(),
+  };
+  const [dates, setDates] = useState(defaultDates);
   const [state, setState] = useState<"idle" | "running" | "accepted" | "error">(
     "idle",
   );
@@ -287,14 +294,7 @@ function Collection({
     setError("");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
-    const range = custom
-      ? dates
-      : {
-          startMonth: MONTHS[start.getMonth()],
-          startYear: start.getFullYear(),
-          endMonth: MONTHS[now.getMonth()],
-          endYear: now.getFullYear(),
-        };
+    const range = custom ? dates : defaultDates;
     try {
       const result = await fetch(WEBHOOKS[mode], {
         method: "POST",
@@ -470,7 +470,7 @@ function Collection({
                 <SlidersHorizontal />
                 <div>
                   <Label htmlFor="custom-dates">Choose a date range</Label>
-                  <p>By default, collect the trailing 12 months.</p>
+                  <p>By default, collect the last 12 completed months.</p>
                 </div>
                 <Switch
                   id="custom-dates"
@@ -602,7 +602,6 @@ function Reports({
   setSheet: (value: string) => void;
 }) {
   const [accessKey, setAccessKey] = useState("");
-  const [detectBrands, setDetectBrands] = useState(false);
   const [brandsDetected, setBrandsDetected] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
@@ -618,6 +617,10 @@ function Reports({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
+  const aiSettingsRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    void loadGoogleIdentity().catch(() => {});
+  }, []);
   const location = report?.locations[locationIndex];
   const matching = useMemo(
     () =>
@@ -659,6 +662,14 @@ function Reports({
   }
   async function writeStrategicRead() {
     if (!report) return;
+    if (!accessKey.trim()) {
+      const settings = aiSettingsRef.current;
+      if (settings) {
+        settings.open = true;
+        settings.querySelector("input")?.focus();
+      }
+      return;
+    }
     setAiBusy(true);
     setAiMessage("");
     try {
@@ -671,10 +682,14 @@ function Reports({
       setAiBusy(false);
     }
   }
-  async function buildSheet() {
+  async function buildSheet(source: "public" | "private" | "ai") {
     const id = sheetIdFromInput(sheet);
     if (!id) {
       setMessage("Paste a valid Google Sheet link or ID.");
+      return;
+    }
+    if (source === "ai" && !accessKey.trim()) {
+      setMessage("Enter the access key in Optional AI tools to detect brands.");
       return;
     }
     setBusy(true);
@@ -682,13 +697,17 @@ function Reports({
     setReport(null);
     setBrandsDetected(false);
     try {
-      const result = await runAnalysisWorkflow(id, accessKey, detectBrands);
-      const brandList = [brands.trim(), ...result.brands]
-        .filter(Boolean)
-        .join(", ");
-      setBrands(brandList);
-      setBrandsDetected(result.detected);
-      applySources(result.sources, brandList);
+      if (source === "ai") {
+        const result = await runAnalysisWorkflow(id, accessKey, true);
+        const brandList = [brands.trim(), ...result.brands]
+          .filter(Boolean)
+          .join(", ");
+        setBrands(brandList);
+        setBrandsDetected(result.detected);
+        applySources(result.sources, brandList);
+      } else {
+        applySources(await readGoogleSheet(id, source === "private"));
+      }
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Could not read the sheet.",
@@ -784,38 +803,9 @@ function Reports({
                   disabled={busy}
                 />
                 <p>
-                  The analysis workflow reads this sheet using its connected
-                  Google account.
+                  For a private Sheet, sign in with a Google account that can
+                  view it.
                 </p>
-              </div>
-              <div className="field">
-                <Label htmlFor="report-access">Analysis access key</Label>
-                <Input
-                  id="report-access"
-                  type="password"
-                  autoComplete="off"
-                  value={accessKey}
-                  onChange={(event) => setAccessKey(event.target.value)}
-                  disabled={busy}
-                  placeholder="Enter your n8n access key"
-                />
-                <p>Ask your workflow administrator for this key.</p>
-              </div>
-              <div className="setting-row">
-                <Sparkles />
-                <div>
-                  <Label htmlFor="detect-brands">Detect brands with AI</Label>
-                  <p>
-                    Optional. Sends keywords to OpenAI and may use paid API
-                    credits. Maximum 5,000 keywords per run.
-                  </p>
-                </div>
-                <Switch
-                  id="detect-brands"
-                  checked={detectBrands}
-                  onCheckedChange={setDetectBrands}
-                  disabled={busy}
-                />
               </div>
               <div className="field">
                 <Label htmlFor="sheet-brands">
@@ -831,24 +821,60 @@ function Reports({
                 />
                 {brandsDetected && (
                   <p>
-                    Review the detected names. Edit the list and turn off AI
-                    detection before rebuilding to use your corrections.
+                    Review the detected names. Edit the list and rebuild the
+                    report to use your corrections.
                   </p>
                 )}
               </div>
-              <Button type="button" onClick={buildSheet} disabled={busy}>
-                {busy ? (
-                  <>
-                    <Loader2 className="spinner" />
-                    Reading sheet
-                  </>
-                ) : (
-                  <>
-                    Build report from sheet <ArrowRight />
-                  </>
-                )}
-              </Button>
+              <div className="sheet-report-actions">
+                <Button
+                  type="button"
+                  onClick={() => buildSheet("public")}
+                  disabled={busy || aiBusy}
+                >
+                  {busy ? <Loader2 className="spinner" /> : <ArrowRight />}
+                  {busy ? "Reading Sheet" : "Build report from public Sheet"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => buildSheet("private")}
+                  disabled={busy || aiBusy}
+                >
+                  Sign in with Google
+                </Button>
+              </div>
             </div>
+            <details className="csv-alternative" ref={aiSettingsRef}>
+              <summary>Optional AI tools</summary>
+              <div className="report-form">
+                <div className="field">
+                  <Label htmlFor="report-access">AI access key</Label>
+                  <Input
+                    id="report-access"
+                    type="password"
+                    autoComplete="off"
+                    value={accessKey}
+                    onChange={(event) => setAccessKey(event.target.value)}
+                    disabled={busy || aiBusy}
+                    placeholder="Enter your n8n access key"
+                  />
+                  <p>Required for brand detection and the strategic read.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => buildSheet("ai")}
+                  disabled={busy || aiBusy}
+                >
+                  <Sparkles /> Detect brands and build report
+                </Button>
+                <p>
+                  Brand detection sends up to 5,000 distinct keywords to OpenAI
+                  and may use paid API credits.
+                </p>
+              </div>
+            </details>
             <details className="csv-alternative">
               <summary>Or import CSV files</summary>
               <form onSubmit={build} className="report-form">
@@ -934,7 +960,7 @@ function Reports({
                     <LockKeyhole />
                     Files stay on your device
                   </span>
-                  <Button type="submit" disabled={busy}>
+                  <Button type="submit" disabled={busy || aiBusy}>
                     {busy ? (
                       <>
                         <Loader2 className="spinner" />
