@@ -73,6 +73,9 @@ import { readGoogleSheet, sheetIdFromInput } from "./google-sheets";
 import { requestStrategicRead } from "./analysis-workflow";
 import type { StrategicRead } from "./analysis-workflow";
 import { buildClaudeBundle } from "./claude-bundle";
+import { askNotificationPermission, notifyUser } from "./notify";
+import { sheetFillProgress } from "./watch-sheet";
+import type { FillProgress } from "./watch-sheet";
 import {
   reportBuild,
   reportBrandRows,
@@ -272,12 +275,20 @@ function Collection({
   sheet,
   setSheet,
   openReport,
+  onFilled,
 }: {
   sheet: string;
   setSheet: (value: string) => void;
   openReport: () => void;
+  onFilled: (sheetId: string) => void;
 }) {
   const [confirmed, setConfirmed] = useState(false);
+  const [watchTarget, setWatchTarget] = useState<{
+    id: string;
+    tabs: string[];
+  } | null>(null);
+  const [progress, setProgress] = useState<FillProgress | null>(null);
+  const [watchNote, setWatchNote] = useState("");
   const [mode, setMode] = useState<Mode>("website");
   const [all, setAll] = useState(true);
   const [locations, setLocations] = useState<string[]>([]);
@@ -298,6 +309,48 @@ function Collection({
   const [error, setError] = useState("");
   const [sheetLink, setSheetLink] = useState("");
   const [response, setResponse] = useState("");
+  useEffect(() => {
+    if (!watchTarget) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let lastRows = -1;
+    let stable = 0;
+    const startedAt = Date.now();
+    async function check() {
+      try {
+        const latest = await sheetFillProgress(
+          watchTarget!.id,
+          watchTarget!.tabs,
+        );
+        if (cancelled) return;
+        setProgress(latest);
+        stable = latest.rows > 0 && latest.rows === lastRows ? stable + 1 : 0;
+        lastRows = latest.rows;
+        if (stable >= 4) {
+          setWatchTarget(null);
+          setWatchNote("Collection finished. Opening your report.");
+          onFilled(watchTarget!.id);
+          return;
+        }
+      } catch {
+        // Try again on the next round.
+      }
+      if (cancelled) return;
+      if (Date.now() - startedAt > 4 * 3600_000) {
+        setWatchTarget(null);
+        setWatchNote(
+          "Stopped watching after 4 hours. Open the Keyword report tab when your sheet is ready.",
+        );
+        return;
+      }
+      timer = setTimeout(check, 45_000);
+    }
+    timer = setTimeout(check, 15_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [watchTarget]);
   async function submit(event: FormEvent) {
     event.preventDefault();
     const raw = sheet.trim();
@@ -322,6 +375,10 @@ function Collection({
       return;
     }
     setConfirmed(false);
+    setWatchTarget(null);
+    setWatchNote("");
+    setProgress(null);
+    void askNotificationPermission();
     setState("running");
     setError("");
     const controller = new AbortController();
@@ -356,6 +413,7 @@ function Collection({
       setResponse(text);
       setSheetLink("https://docs.google.com/spreadsheets/d/" + id + "/edit");
       setState("accepted");
+      if (id) setWatchTarget({ id, tabs: all ? [...LOCATIONS] : locations });
     } catch (error) {
       setError(
         error instanceof Error && error.name === "AbortError"
@@ -579,6 +637,28 @@ function Collection({
                       ? "The workflow reported that the location loop finished."
                       : "The workflow accepted your request. Check your spreadsheet to see when it finishes."}
                   </p>
+                  {watchTarget && (
+                    <p>
+                      Watching your sheet:{" "}
+                      {progress
+                        ? `${progress.filled} of ${progress.total} locations have data.`
+                        : "checking…"}{" "}
+                      Keep this page open. When the data stops growing, the
+                      keyword report opens, the AI summary is written, and you
+                      get a browser notification.{" "}
+                      <button
+                        type="button"
+                        className="keyword-trend-link"
+                        onClick={() => {
+                          setWatchTarget(null);
+                          setWatchNote("Stopped watching.");
+                        }}
+                      >
+                        Stop watching
+                      </button>
+                    </p>
+                  )}
+                  {watchNote && <p>{watchNote}</p>}
                   <a href={sheetLink} target="_blank" rel="noopener noreferrer">
                     Open your spreadsheet <ArrowUpRight size={14} />
                   </a>
@@ -629,9 +709,11 @@ function Collection({
 function Reports({
   sheet,
   setSheet,
+  autoBuild,
 }: {
   sheet: string;
   setSheet: (value: string) => void;
+  autoBuild: number;
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
@@ -651,6 +733,8 @@ function Reports({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
+  const autoFlow = useRef(false);
+  const aiAutoFor = useRef<Report | null>(null);
   const keywordTrendRef = useRef<HTMLSpanElement>(null);
   const location = report?.locations[locationIndex];
   const opportunities = useMemo(
@@ -730,16 +814,39 @@ function Reports({
     if (!report) return;
     setAiBusy(true);
     setAiMessage("");
+    let written = false;
     try {
       setAiRead(await requestStrategicRead(reportFacts(report, location)));
+      written = true;
     } catch (error) {
       setAiMessage(
         error instanceof Error ? error.message : "The strategic read failed.",
       );
     } finally {
       setAiBusy(false);
+      if (autoFlow.current || document.hidden) {
+        notifyUser(
+          "Your keyword report is ready",
+          `${report.locations.length} locations, ${format(report.unique)} keywords. ` +
+            (written
+              ? "The AI summary is written."
+              : "The AI summary could not be written."),
+        );
+      }
+      autoFlow.current = false;
     }
   }
+  useEffect(() => {
+    if (!report || aiAutoFor.current === report) return;
+    aiAutoFor.current = report;
+    void writeStrategicRead();
+  }, [report]);
+  useEffect(() => {
+    if (autoBuild > 0) {
+      autoFlow.current = true;
+      void buildSheet();
+    }
+  }, [autoBuild]);
   async function buildSheet() {
     const id = sheetIdFromInput(sheet);
     if (!id) {
@@ -1339,8 +1446,9 @@ function Reports({
               <div className="ai-read">
                 <h3>Strategic read (AI)</h3>
                 <p className="helper">
-                  Sends the summary and the keyword examples for {location.name}{" "}
-                  to OpenAI to generate hypotheses. This may incur API charges.
+                  Written automatically when the report is ready, from the
+                  summary and keyword examples for {location.name}. It goes to
+                  OpenAI and costs well under a rupee per report.
                 </p>
                 <Button
                   type="button"
@@ -1676,6 +1784,7 @@ function Reports({
 
 export default function App() {
   const [sheet, setSheet] = useState("");
+  const [autoBuild, setAutoBuild] = useState(0);
   const [workspace, setWorkspace] = useState<"collection" | "report">(
     "collection",
   );
@@ -1776,10 +1885,17 @@ export default function App() {
               sheet={sheet}
               setSheet={setSheet}
               openReport={() => setWorkspace("report")}
+              onFilled={(id) => {
+                setSheet(
+                  "https://docs.google.com/spreadsheets/d/" + id + "/edit",
+                );
+                setWorkspace("report");
+                setAutoBuild((n) => n + 1);
+              }}
             />
           </div>
           <div hidden={workspace !== "report"}>
-            <Reports sheet={sheet} setSheet={setSheet} />
+            <Reports sheet={sheet} setSheet={setSheet} autoBuild={autoBuild} />
           </div>
           <footer>
             <span>The Bored Monkey · Keyword Workbench</span>

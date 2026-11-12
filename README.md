@@ -58,3 +58,7 @@ Bid amounts appear in rupees in the report and CSV. For plain `Low bid` and `Hig
 ## Export for Claude Code
 
 **Export for Claude Code** (report header) downloads one ZIP with everything in the report: `README_FOR_CLAUDE_CODE.md` (source, column guide, rules, calculated headline numbers, next steps), `keywords_all_locations.csv` (every keyword in every location with bids in rupees, tags and monthly volumes), `locations_summary.csv`, `brands_by_location.csv` (when a brand list was supplied), `facts.json`, and `strategic_read.md` (only if the AI read was generated). Nothing is sent anywhere; the ZIP is built in the browser.
+
+## Automatic report after collection
+
+After **Start collection**, the page asks once for browser notification permission and then watches the Sheet. It counts the rows in each location tab every 45 seconds and, when the total has not changed for about three minutes, opens the **Keyword report**, builds it from the Sheet, and writes the AI strategic read without a click. When that finishes it shows a browser notification. The page has to stay open (a background tab is fine). The watcher stops after 4 hours or when you press **Stop watching**. Collection itself runs in n8n and does not need the page.
