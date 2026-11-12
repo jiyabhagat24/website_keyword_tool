@@ -246,13 +246,15 @@ function Collection({
   const [locations, setLocations] = useState<string[]>([]);
   const [custom, setCustom] = useState(false);
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-  const [dates, setDates] = useState({
+  const start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const defaultDates = {
     startMonth: MONTHS[start.getMonth()],
     startYear: start.getFullYear(),
-    endMonth: MONTHS[now.getMonth()],
-    endYear: now.getFullYear(),
-  });
+    endMonth: MONTHS[end.getMonth()],
+    endYear: end.getFullYear(),
+  };
+  const [dates, setDates] = useState(defaultDates);
   const [state, setState] = useState<"idle" | "running" | "accepted" | "error">(
     "idle",
   );
@@ -287,14 +289,7 @@ function Collection({
     setError("");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
-    const range = custom
-      ? dates
-      : {
-          startMonth: MONTHS[start.getMonth()],
-          startYear: start.getFullYear(),
-          endMonth: MONTHS[now.getMonth()],
-          endYear: now.getFullYear(),
-        };
+    const range = custom ? dates : defaultDates;
     try {
       const result = await fetch(WEBHOOKS[mode], {
         method: "POST",
@@ -470,7 +465,7 @@ function Collection({
                 <SlidersHorizontal />
                 <div>
                   <Label htmlFor="custom-dates">Choose a date range</Label>
-                  <p>By default, collect the trailing 12 months.</p>
+                  <p>By default, collect the last 12 completed months.</p>
                 </div>
                 <Switch
                   id="custom-dates"
