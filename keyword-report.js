@@ -356,7 +356,80 @@ function reportReadLocation(name, rows, getTags) {
   };
 }
 
+/**
+ * "Dot & Key | Dotandkey" also matches "dot and key". The first name is the
+ * one shown; every other spelling counts as the same brand.
+ */
+function reportExpandBrand(entry) {
+  const names = entry
+    .split("|")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const spellings = new Set();
+  for (const name of names) {
+    spellings.add(name);
+    const spelled = name.replace(/\s*&\s*/g, " and ").replace(/\s+/g, " ");
+    spellings.add(spelled);
+    if (/\s/.test(spelled)) spellings.add(spelled.replace(/\s+/g, ""));
+  }
+  return [...spellings].join(" | ");
+}
+
+/**
+ * Brand names and intent counts written into the master Sheet by the classifier.
+ * Brand entries keep their "Name | alias" form so aliases are matched too.
+ */
+function reportSheetInfo(sources) {
+  const known = ["Keyword input", "Website Input"];
+  const find = (wanted) =>
+    sources.find(
+      (source) =>
+        !source.error &&
+        source.text &&
+        reportNormalize(reportFileLabel(source.name, known)) === wanted,
+    );
+  const column = (header, name) => header.map(reportNormalize).indexOf(name);
+  const brands = new Set();
+  const intents = new Map();
+  const brandKeywords = new Map();
+  const keywordInput = find("keyword input");
+  if (keywordInput) {
+    const [header = [], ...records] = reportParseCsv(keywordInput.text);
+    const intentColumn = column(header, "intent");
+    const brandColumn = column(header, "brand");
+    for (const row of records) {
+      const intent = String(row[intentColumn] ?? "").trim();
+      if (intent) intents.set(intent, (intents.get(intent) ?? 0) + 1);
+      const brand = String(row[brandColumn] ?? "").trim();
+      if (brand) {
+        brandKeywords.set(brand, (brandKeywords.get(brand) ?? 0) + 1);
+        brands.add(brand);
+      }
+    }
+  }
+  const websites = find("website input");
+  if (websites) {
+    const [header = [], ...records] = reportParseCsv(websites.text);
+    const brandColumn = column(header, "brand");
+    if (brandColumn >= 0) {
+      for (const row of records) {
+        const entry = String(row[brandColumn] ?? "").trim();
+        if (entry) brands.add(entry);
+      }
+    }
+  }
+  return {
+    brands: [...new Set([...brands].map(reportExpandBrand))],
+    intents,
+    brandKeywords,
+  };
+}
+
 function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
+  const sheetInfo = reportSheetInfo(sources);
+  rawBrands = [rawBrands, ...sheetInfo.brands.filter((b) => !b.includes(","))]
+    .filter(Boolean)
+    .join(",");
   const locations = [];
   const errors = [];
   const seeds = new Set();
@@ -480,6 +553,14 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
     errors,
     unique: tagsByKeyword.size,
     brands: [...brands],
+    sheetBrandCount: sheetInfo.brands.length,
+    sheetIntents: Object.fromEntries(
+      [...sheetInfo.intents.entries()].sort((a, b) => b[1] - a[1]),
+    ),
+    sheetBrandKeywords: [...sheetInfo.brandKeywords.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([brand, keywords]) => ({ brand, keywords })),
     absentBrands: [...brands].filter((brand) => !seenBrands.has(brand)),
     seedCount: selectedSeeds.size,
     seedHits: seedHits.size,
@@ -653,6 +734,13 @@ function reportFacts(report, selectedLocation) {
             : [];
         }),
     },
+    masterSheet: Object.keys(report.sheetIntents ?? {}).length
+      ? {
+          note: "Intent and Brand were assigned by rules when the keywords were collected. Counts are keywords, not searches.",
+          intentCounts: report.sheetIntents,
+          brandsByKeywordCount: report.sheetBrandKeywords,
+        }
+      : undefined,
     topLocations: report.locations.slice(0, 12).map((location) => {
       const volumeShares = reportVolumeShares(location);
       return {

@@ -189,6 +189,20 @@ function downloadCsv(name: string, rows: unknown[][]) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const intentMeaning: Record<string, string> = {
+  Branded: "Contains the site's own brand name",
+  "Competitor brand": "Contains another brand's name",
+  Generic: "No brand: a plain product or category term",
+  "Best / Review": "Looking for the best option or reviews",
+  "Price / Buy": "Price, deals or buying online",
+  Question: "Asking something, such as is it safe",
+  "How-to": "Wants to learn how to use or do something",
+  Concern: "A skin or hair problem",
+  Ingredient: "An active ingredient",
+  Comparison: "Comparing two or more options",
+  Local: "Near me or nearby",
+};
+
 function downloadClaudeBundle(
   report: Parameters<typeof buildClaudeBundle>[0],
   options: Parameters<typeof buildClaudeBundle>[1],
@@ -1259,6 +1273,43 @@ function Reports({
               </details>
             </CardContent>
           </Card>
+          {Object.keys(report.sheetIntents ?? {}).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>What people are looking for</CardTitle>
+                <CardDescription>
+                  Every keyword in your Sheet is sorted by intent when it is
+                  collected. Counts are keywords, not searches.
+                  {report.sheetBrandCount > 0 &&
+                    ` ${report.sheetBrandCount} brand names from your Sheet are used for the brand tables and the AI summary.`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DataTable
+                  label="Keyword intent"
+                  headers={[
+                    "Intent",
+                    "What it means",
+                    { label: "Keywords", numeric: true },
+                    { label: "Share", numeric: true },
+                  ]}
+                  rows={Object.entries(
+                    report.sheetIntents as Record<string, number>,
+                  ).map(([intent, count]) => {
+                    const total = Object.values(
+                      report.sheetIntents as Record<string, number>,
+                    ).reduce((sum, value) => sum + value, 0);
+                    return [
+                      intent,
+                      intentMeaning[intent] ?? "",
+                      format(count),
+                      `${format(reportPercent(count, total))}%`,
+                    ];
+                  })}
+                />
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <div className="card-heading">

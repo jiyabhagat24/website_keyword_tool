@@ -62,3 +62,11 @@ Bid amounts appear in rupees in the report and CSV. For plain `Low bid` and `Hig
 ## Automatic report after collection
 
 After **Start collection**, the page asks once for browser notification permission and then watches the Sheet. It counts the rows in each location tab every 45 seconds and, when the total has not changed for about three minutes, opens the **Keyword report**, builds it from the Sheet, and writes the AI strategic read without a click. When that finishes it shows a browser notification. The page has to stay open (a background tab is fine). The watcher stops after 4 hours or when you press **Stop watching**. Collection itself runs in n8n and does not need the page.
+
+## Intent and Brand columns
+
+The **Keyword Classifier** n8n workflow (`POST /webhook/keyword-classifier`, body `{"sheetUrl": "...", "tab": "Keyword input"}`) adds **Intent** and **Brand** columns to a keyword tab. It is rule based, so it costs nothing. Its code is in `workflows/keyword-classifier-code.js`. Add `"dryRun": true` to count without writing and `"overwrite": true` to redo rows that already have an Intent.
+
+Intents, checked in this order: Branded (the site's own brand), Competitor brand (another brand), Comparison, Local, Price / Buy, Best / Review, Question, How-to, Concern, Ingredient, Generic. Brand names come from the optional **Brand** column in **Website Input** (`Name | alias | alias`), or from the web address when that is blank. The collection workflows call the classifier when they finish, for the **Keyword input** and **Keyword Suggestion** tabs.
+
+The report reads those brand names and the Intent counts from the Sheet, so brand tables and the AI summary work without typing a brand list.
