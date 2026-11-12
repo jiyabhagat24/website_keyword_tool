@@ -304,6 +304,7 @@ function Collection({
   const [progress, setProgress] = useState<FillProgress | null>(null);
   const [watchNote, setWatchNote] = useState("");
   const [mode, setMode] = useState<Mode>("website");
+  const [brandsText, setBrandsText] = useState("");
   const [all, setAll] = useState(true);
   const [locations, setLocations] = useState<string[]>([]);
   const [custom, setCustom] = useState(false);
@@ -406,6 +407,9 @@ function Collection({
           sheetUrl: id,
           allLocations: all,
           ...(!all ? { locations } : {}),
+          ...(mode === "keywords" && brandsText.trim()
+            ? { brands: brandsText.trim() }
+            : {}),
           ...range,
         }),
         signal: controller.signal,
@@ -515,6 +519,24 @@ function Collection({
                   automation account.
                 </p>
               </div>
+              {mode === "keywords" && (
+                <div className="field">
+                  <Label htmlFor="collection-brands">
+                    Brands to track (optional)
+                  </Label>
+                  <Input
+                    id="collection-brands"
+                    value={brandsText}
+                    onChange={(event) => setBrandsText(event.target.value)}
+                    placeholder="Dot & Key | dot and key, The Derma Co"
+                  />
+                  <p>
+                    Keywords with these brand names are marked Branded in the
+                    Intent column. Separate brands with commas and add other
+                    spellings with |.
+                  </p>
+                </div>
+              )}
               <div className="options-heading">
                 <SlidersHorizontal />
                 <h3>Collection settings</h3>

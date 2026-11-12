@@ -376,8 +376,8 @@ function reportExpandBrand(entry) {
 }
 
 /**
- * Brand names and intent counts written into the master Sheet by the classifier.
- * Brand entries keep their "Name | alias" form so aliases are matched too.
+ * Brand names and intent counts written into the keyword Sheet by the classifier.
+ * Only the keyword workflow marks brands; the website workflow does not.
  */
 function reportSheetInfo(sources) {
   const known = ["Keyword input", "Website Input"];
@@ -404,17 +404,6 @@ function reportSheetInfo(sources) {
       if (brand) {
         brandKeywords.set(brand, (brandKeywords.get(brand) ?? 0) + 1);
         brands.add(brand);
-      }
-    }
-  }
-  const websites = find("website input");
-  if (websites) {
-    const [header = [], ...records] = reportParseCsv(websites.text);
-    const brandColumn = column(header, "brand");
-    if (brandColumn >= 0) {
-      for (const row of records) {
-        const entry = String(row[brandColumn] ?? "").trim();
-        if (entry) brands.add(entry);
       }
     }
   }
