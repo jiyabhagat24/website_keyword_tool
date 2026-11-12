@@ -7,7 +7,6 @@ export interface AnalysisResponse {
 
 export async function runAnalysisWorkflow(
   sheetId: string,
-  accessKey: string,
   detectBrands: boolean,
 ): Promise<AnalysisResponse> {
   const endpoint = import.meta.env.VITE_ANALYSIS_WEBHOOK_URL?.trim();
@@ -23,8 +22,6 @@ export async function runAnalysisWorkflow(
   }
   if (url.protocol !== "https:")
     throw new Error("The analysis workflow URL must use HTTPS.");
-  if (!accessKey.trim())
-    throw new Error("Enter the analysis access key configured in n8n.");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 300000);
   try {
@@ -32,15 +29,10 @@ export async function runAnalysisWorkflow(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Report-Key": accessKey.trim(),
       },
       body: JSON.stringify({ sheetId, detectBrands }),
       signal: controller.signal,
     });
-    if (response.status === 401 || response.status === 403)
-      throw new Error(
-        "The analysis access key was rejected. Check the n8n webhook credential.",
-      );
     if (!response.ok)
       throw new Error(
         `The analysis workflow returned HTTP ${response.status}. Check its execution in n8n.`,
@@ -84,7 +76,6 @@ export interface StrategicRead {
 /** Sends calculated facts and selected keyword examples for AI hypotheses. */
 export async function requestStrategicRead(
   facts: unknown,
-  accessKey: string,
 ): Promise<StrategicRead> {
   const endpoint = import.meta.env.VITE_ANALYSIS_WEBHOOK_URL?.trim();
   if (!endpoint)
@@ -94,8 +85,6 @@ export async function requestStrategicRead(
   const url = new URL(endpoint);
   if (url.protocol !== "https:")
     throw new Error("The analysis workflow URL must use HTTPS.");
-  if (!accessKey.trim())
-    throw new Error("Enter the analysis access key configured in n8n.");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 180000);
   try {
@@ -103,13 +92,10 @@ export async function requestStrategicRead(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Report-Key": accessKey.trim(),
       },
       body: JSON.stringify({ mode: "narrative", facts }),
       signal: controller.signal,
     });
-    if (response.status === 401 || response.status === 403)
-      throw new Error("The analysis access key was rejected.");
     if (!response.ok)
       throw new Error(
         `The strategic read returned HTTP ${response.status}. Check its execution in n8n.`,

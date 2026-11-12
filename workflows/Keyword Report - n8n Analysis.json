@@ -13,7 +13,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "keyword-report-analysis",
-        "authentication": "headerAuth",
+        "authentication": "none",
         "responseMode": "responseNode",
         "options": {
           "allowedOrigins": "https://YOUR-WEBSITE-ORIGIN"

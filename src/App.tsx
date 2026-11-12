@@ -624,7 +624,6 @@ function Reports({
   sheet: string;
   setSheet: (value: string) => void;
 }) {
-  const [accessKey, setAccessKey] = useState("");
   const [brandsDetected, setBrandsDetected] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
@@ -748,20 +747,10 @@ function Reports({
   }
   async function writeStrategicRead() {
     if (!report) return;
-    if (!accessKey.trim()) {
-      const settings = aiSettingsRef.current;
-      if (settings) {
-        settings.open = true;
-        settings.querySelector("input")?.focus();
-      }
-      return;
-    }
     setAiBusy(true);
     setAiMessage("");
     try {
-      setAiRead(
-        await requestStrategicRead(reportFacts(report, location), accessKey),
-      );
+      setAiRead(await requestStrategicRead(reportFacts(report, location)));
     } catch (error) {
       setAiMessage(
         error instanceof Error ? error.message : "The strategic read failed.",
@@ -776,17 +765,13 @@ function Reports({
       setMessage("Paste a valid Google Sheet link or ID.");
       return;
     }
-    if (source === "ai" && !accessKey.trim()) {
-      setMessage("Enter the access key in Optional AI tools to detect brands.");
-      return;
-    }
     setBusy(true);
     setMessage("");
     setReport(null);
     setBrandsDetected(false);
     try {
       if (source === "ai") {
-        const result = await runAnalysisWorkflow(id, accessKey, true);
+        const result = await runAnalysisWorkflow(id, true);
         const brandList = [brands.trim(), ...result.brands]
           .filter(Boolean)
           .join(", ");
@@ -948,19 +933,6 @@ function Reports({
             <details className="csv-alternative" ref={aiSettingsRef}>
               <summary>Optional AI tools</summary>
               <div className="report-form">
-                <div className="field">
-                  <Label htmlFor="report-access">AI access key</Label>
-                  <Input
-                    id="report-access"
-                    type="password"
-                    autoComplete="off"
-                    value={accessKey}
-                    onChange={(event) => setAccessKey(event.target.value)}
-                    disabled={busy || aiBusy}
-                    placeholder="Enter your n8n access key"
-                  />
-                  <p>Required for brand detection and the strategic read.</p>
-                </div>
                 <Button
                   type="button"
                   variant="outline"
