@@ -18,14 +18,23 @@ Component provenance and license are in `src/components/watermelon/`. The interf
 2. Give the Google account used by the automation Editor access to your copy. Add your input in the matching input tab.
 3. Paste your spreadsheet link or ID into the workbench, choose locations or dates if needed, and submit. The workflow writes results to the spreadsheet.
 
-## Connect the n8n analysis workflow
+## Read Google Sheets directly
+
+Enable the Google Sheets API in your Google Cloud project and configure the website's build variables:
+
+- `VITE_GOOGLE_SHEETS_API_KEY` for public Sheets. Restrict the browser API key to your website's HTTP referrers and the Google Sheets API.
+- `VITE_GOOGLE_CLIENT_ID` for private Sheets. Create an OAuth web client and add the website's origin under **Authorized JavaScript origins**. Configure the consent screen for the read-only Sheets scope and add test users if the app is in testing mode.
+
+Rebuild the website after setting the variables. In **Keyword report**, paste the Sheet link and select **Build report from public Sheet** or **Sign in with Google**. The Google account used for private Sheets must be able to view the workbook. The report reads standard location and input tabs. Use CSV import for custom location names.
+
+## Configure optional AI tools in n8n
 
 1. Import `workflows/Keyword Report - n8n Analysis.json` as a new n8n workflow. It is inactive when imported.
 2. In **Analysis Webhook**, create or choose a Header Auth credential with header name `X-Report-Key` and a strong value. Share that value only with people who may run reports. Replace `https://YOUR-WEBSITE-ORIGIN` in the webhook's allowed origins with the exact origin of your website.
 3. Connect the existing Google Sheets OAuth credential to **List Sheet Tabs** and **Read Sheet Tabs**. That Google account needs access to the copied spreadsheet.
 4. To use optional brand detection, connect the existing OpenAI credential to **OpenAI Detect Brands**. Brand detection sends keywords to OpenAI and can incur API charges. The workflow allows up to 5,000 distinct keywords when it is enabled. It uses `gpt-4.1-mini`, which can be changed in that node.
 5. Publish the workflow. Set `VITE_ANALYSIS_WEBHOOK_URL` in your hosting service to the production HTTPS webhook URL and rebuild the website. For local development, place that variable in the gitignored `.env.local` file.
-6. The user pastes the copied spreadsheet link into **Collect data**. After the workflow reports completion, **Open keyword report** carries that link to the report. Enter the analysis access key and select **Build report from sheet**. OpenAI brand detection is optional and off by default. Review suggested brands before using them for decisions.
+6. In **Keyword report**, open **Optional AI tools** and enter the analysis access key. Choose **Detect brands and build report** for OpenAI brand detection or **Write strategic read** after a report is available. Review suggested brands before using them for decisions.
 
 The workflow reads the standard location and input tabs. Use CSV import for custom location names. The analysis runs after the user starts it and the n8n webhook responds; large sheets and paid brand detection can hit execution, response-size, rate, or proxy timeout limits. Check the n8n execution before retrying after a timeout. The live n8n workflow and its completion behavior must be tested in your instance before relying on automatic handoff.
 
