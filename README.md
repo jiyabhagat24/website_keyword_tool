@@ -20,12 +20,11 @@ Component provenance and license are in `src/components/watermelon/`. The interf
 
 ## Read Google Sheets directly
 
-Enable the Google Sheets API in your Google Cloud project and configure the website's build variables:
+For a public Sheet, set **General access** to **Anyone with the link → Viewer** and allow downloads. In **Keyword report**, paste the link and select **Build report from public Sheet**. The browser reads Google's workbook export directly. No Google sign-in, Google API key, or n8n key is required.
 
-- `VITE_GOOGLE_SHEETS_API_KEY` for public Sheets. Restrict the browser API key to your website's HTTP referrers and the Google Sheets API.
-- `VITE_GOOGLE_CLIENT_ID` for private Sheets. Create an OAuth web client and add the website's origin under **Authorized JavaScript origins**. Configure the consent screen for the read-only Sheets scope and add test users if the app is in testing mode.
+For private Sheets, enable the Google Sheets API and set `VITE_GOOGLE_CLIENT_ID` to a Google OAuth web client ID. Add the website's origin under **Authorized JavaScript origins**, configure the consent screen for the read-only Sheets scope, and rebuild. Select **Sign in with Google** and use an account that can view the Sheet.
 
-Rebuild the website after setting the variables. In **Keyword report**, paste the Sheet link and select **Build report from public Sheet** or **Sign in with Google**. The Google account used for private Sheets must be able to view the workbook. The report reads standard location and input tabs. Use CSV import for custom location names.
+If you configure `VITE_GOOGLE_SHEETS_API_KEY`, the public import uses the Google Sheets API. Restrict the browser API key to your website's HTTP referrers and the Google Sheets API. The report reads standard location and input tabs. Use CSV import for custom location names.
 
 ## Configure optional AI tools in n8n
 
