@@ -73,6 +73,9 @@ import { readGoogleSheet, sheetIdFromInput } from "./google-sheets";
 import { requestStrategicRead } from "./analysis-workflow";
 import type { StrategicRead } from "./analysis-workflow";
 import { buildClaudeBundle } from "./claude-bundle";
+import { askNotificationPermission, notifyUser } from "./notify";
+import { sheetFillProgress } from "./watch-sheet";
+import type { FillProgress } from "./watch-sheet";
 import {
   reportBuild,
   reportBrandRows,
@@ -106,23 +109,33 @@ const formatBid = (rupees: number | null) =>
         maximumFractionDigits: 2,
       }).format(rupees);
 
+type TableHeader = string | { label: string; hint?: string; numeric?: boolean };
+
 function DataTable({
   headers,
   rows,
   label,
 }: {
-  headers: string[];
+  headers: TableHeader[];
   rows: ReactNode[][];
   label: string;
 }) {
+  const columns = headers.map((header) =>
+    typeof header === "string" ? { label: header } : header,
+  );
   return (
     <div className="data-table" tabIndex={0} role="region" aria-label={label}>
       <Table>
         <TableHeader>
           <TableRow>
-            {headers.map((header) => (
-              <TableHead key={header} scope="col">
-                {header}
+            {columns.map((column) => (
+              <TableHead
+                key={column.label}
+                scope="col"
+                className={column.numeric ? "num" : undefined}
+              >
+                {column.label}
+                {column.hint && <span className="th-hint">{column.hint}</span>}
               </TableHead>
             ))}
           </TableRow>
@@ -131,7 +144,12 @@ function DataTable({
           {rows.map((row, index) => (
             <TableRow key={index}>
               {row.map((cell, i) => (
-                <TableCell key={i}>{cell}</TableCell>
+                <TableCell
+                  key={i}
+                  className={columns[i]?.numeric ? "num" : undefined}
+                >
+                  {cell}
+                </TableCell>
               ))}
             </TableRow>
           ))}
@@ -257,12 +275,20 @@ function Collection({
   sheet,
   setSheet,
   openReport,
+  onFilled,
 }: {
   sheet: string;
   setSheet: (value: string) => void;
   openReport: () => void;
+  onFilled: (sheetId: string) => void;
 }) {
   const [confirmed, setConfirmed] = useState(false);
+  const [watchTarget, setWatchTarget] = useState<{
+    id: string;
+    tabs: string[];
+  } | null>(null);
+  const [progress, setProgress] = useState<FillProgress | null>(null);
+  const [watchNote, setWatchNote] = useState("");
   const [mode, setMode] = useState<Mode>("website");
   const [all, setAll] = useState(true);
   const [locations, setLocations] = useState<string[]>([]);
@@ -283,6 +309,48 @@ function Collection({
   const [error, setError] = useState("");
   const [sheetLink, setSheetLink] = useState("");
   const [response, setResponse] = useState("");
+  useEffect(() => {
+    if (!watchTarget) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let lastRows = -1;
+    let stable = 0;
+    const startedAt = Date.now();
+    async function check() {
+      try {
+        const latest = await sheetFillProgress(
+          watchTarget!.id,
+          watchTarget!.tabs,
+        );
+        if (cancelled) return;
+        setProgress(latest);
+        stable = latest.rows > 0 && latest.rows === lastRows ? stable + 1 : 0;
+        lastRows = latest.rows;
+        if (stable >= 4) {
+          setWatchTarget(null);
+          setWatchNote("Collection finished. Opening your report.");
+          onFilled(watchTarget!.id);
+          return;
+        }
+      } catch {
+        // Try again on the next round.
+      }
+      if (cancelled) return;
+      if (Date.now() - startedAt > 4 * 3600_000) {
+        setWatchTarget(null);
+        setWatchNote(
+          "Stopped watching after 4 hours. Open the Keyword report tab when your sheet is ready.",
+        );
+        return;
+      }
+      timer = setTimeout(check, 45_000);
+    }
+    timer = setTimeout(check, 15_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [watchTarget]);
   async function submit(event: FormEvent) {
     event.preventDefault();
     const raw = sheet.trim();
@@ -307,6 +375,10 @@ function Collection({
       return;
     }
     setConfirmed(false);
+    setWatchTarget(null);
+    setWatchNote("");
+    setProgress(null);
+    void askNotificationPermission();
     setState("running");
     setError("");
     const controller = new AbortController();
@@ -341,6 +413,7 @@ function Collection({
       setResponse(text);
       setSheetLink("https://docs.google.com/spreadsheets/d/" + id + "/edit");
       setState("accepted");
+      if (id) setWatchTarget({ id, tabs: all ? [...LOCATIONS] : locations });
     } catch (error) {
       setError(
         error instanceof Error && error.name === "AbortError"
@@ -564,6 +637,28 @@ function Collection({
                       ? "The workflow reported that the location loop finished."
                       : "The workflow accepted your request. Check your spreadsheet to see when it finishes."}
                   </p>
+                  {watchTarget && (
+                    <p>
+                      Watching your sheet:{" "}
+                      {progress
+                        ? `${progress.filled} of ${progress.total} locations have data.`
+                        : "checking…"}{" "}
+                      Keep this page open. When the data stops growing, the
+                      keyword report opens, the AI summary is written, and you
+                      get a browser notification.{" "}
+                      <button
+                        type="button"
+                        className="keyword-trend-link"
+                        onClick={() => {
+                          setWatchTarget(null);
+                          setWatchNote("Stopped watching.");
+                        }}
+                      >
+                        Stop watching
+                      </button>
+                    </p>
+                  )}
+                  {watchNote && <p>{watchNote}</p>}
                   <a href={sheetLink} target="_blank" rel="noopener noreferrer">
                     Open your spreadsheet <ArrowUpRight size={14} />
                   </a>
@@ -614,9 +709,11 @@ function Collection({
 function Reports({
   sheet,
   setSheet,
+  autoBuild,
 }: {
   sheet: string;
   setSheet: (value: string) => void;
+  autoBuild: number;
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [brands, setBrands] = useState("");
@@ -636,6 +733,8 @@ function Reports({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
+  const autoFlow = useRef(false);
+  const aiAutoFor = useRef<Report | null>(null);
   const keywordTrendRef = useRef<HTMLSpanElement>(null);
   const location = report?.locations[locationIndex];
   const opportunities = useMemo(
@@ -715,16 +814,39 @@ function Reports({
     if (!report) return;
     setAiBusy(true);
     setAiMessage("");
+    let written = false;
     try {
       setAiRead(await requestStrategicRead(reportFacts(report, location)));
+      written = true;
     } catch (error) {
       setAiMessage(
         error instanceof Error ? error.message : "The strategic read failed.",
       );
     } finally {
       setAiBusy(false);
+      if (autoFlow.current || document.hidden) {
+        notifyUser(
+          "Your keyword report is ready",
+          `${report.locations.length} locations, ${format(report.unique)} keywords. ` +
+            (written
+              ? "The AI summary is written."
+              : "The AI summary could not be written."),
+        );
+      }
+      autoFlow.current = false;
     }
   }
+  useEffect(() => {
+    if (!report || aiAutoFor.current === report) return;
+    aiAutoFor.current = report;
+    void writeStrategicRead();
+  }, [report]);
+  useEffect(() => {
+    if (autoBuild > 0) {
+      autoFlow.current = true;
+      void buildSheet();
+    }
+  }, [autoBuild]);
   async function buildSheet() {
     const id = sheetIdFromInput(sheet);
     if (!id) {
@@ -986,7 +1108,10 @@ function Reports({
               <h2 id="report-title" tabIndex={-1} ref={resultsRef}>
                 Your search landscape
               </h2>
-              <p>Google rounds search volumes. Compare tiers and buckets.</p>
+              <p>
+                Google rounds search volumes, so compare levels rather than
+                exact numbers.
+              </p>
             </div>
             <div className="sheet-report-actions">
               <DownloadButton
@@ -1013,19 +1138,21 @@ function Reports({
               <CardContent>
                 <span>Locations compared</span>
                 <strong>{report.locations.length}</strong>
-                <small>From your imported exports</small>
+                <small>Location tabs read from your data</small>
               </CardContent>
             </Card>
             <Card>
               <CardContent>
                 <span>Keywords with demand</span>
                 <strong>{format(report.unique)}</strong>
-                <small>Distinct across all locations</small>
+                <small>
+                  Different keywords, counted once across all locations
+                </small>
               </CardContent>
             </Card>
             <Card>
               <CardContent>
-                <span>Seed hit rate</span>
+                <span>Starting keywords found</span>
                 <strong>
                   {report.seedCount
                     ? format(reportPercent(report.seedHits, report.seedCount)) +
@@ -1034,8 +1161,8 @@ function Reports({
                 </strong>
                 <small>
                   {report.seedCount
-                    ? `${report.seedHits} of ${report.seedCount} exact matches`
-                    : "Add an input CSV to measure"}
+                    ? `${report.seedHits} of ${report.seedCount} of your starting keywords have search data`
+                    : "Add the Keyword input tab to measure this"}
                 </small>
               </CardContent>
             </Card>
@@ -1046,7 +1173,7 @@ function Reports({
               <CardDescription>
                 {report.locations.filter((item) => item.keywords.size <= 1)
                   .length
-                  ? "Zero or one keyword with demand in " +
+                  ? "Almost no data (one keyword or none) in " +
                     report.locations
                       .filter((item) => item.keywords.size <= 1)
                       .map((item) => item.name)
@@ -1060,10 +1187,26 @@ function Reports({
                 label="Demand by location"
                 headers={[
                   "Location",
-                  "Keywords with demand",
-                  "Volume buckets",
-                  "Peak volume",
-                  "Seed hits",
+                  {
+                    label: "Keywords with demand",
+                    hint: "Searched monthly",
+                    numeric: true,
+                  },
+                  {
+                    label: "Volume levels",
+                    hint: "Distinct values",
+                    numeric: true,
+                  },
+                  {
+                    label: "Top monthly searches",
+                    hint: "Highest here",
+                    numeric: true,
+                  },
+                  {
+                    label: "Starting keywords",
+                    hint: "Found with data",
+                    numeric: true,
+                  },
                 ]}
                 rows={report.locations.map((item) => [
                   <span className="location-name">
@@ -1073,7 +1216,7 @@ function Reports({
                   format(item.keywords.size),
                   format(item.buckets),
                   format(item.maxVolume),
-                  report.seedCount ? item.seedHits : "—",
+                  report.seedCount ? format(item.seedHits) : "—",
                 ])}
               />
               <details className="csv-alternative">
@@ -1087,9 +1230,17 @@ function Reports({
                   label="Regional volume shares"
                   headers={[
                     "Location",
-                    "Branded",
-                    ...reportIntents.map(([name]) => name),
-                    "City vs. state",
+                    { label: "Branded", hint: "% of searches", numeric: true },
+                    ...reportIntents.map(([name]) => ({
+                      label: name,
+                      hint: "% of searches",
+                      numeric: true,
+                    })),
+                    {
+                      label: "City's share of its state",
+                      hint: "Cities only",
+                      numeric: true,
+                    },
                   ]}
                   rows={report.locations.map((item) => {
                     const shares = reportVolumeShares(item);
@@ -1114,7 +1265,8 @@ function Reports({
                 <div>
                   <CardTitle>Find an opportunity</CardTitle>
                   <CardDescription>
-                    Choose a group below to filter the keyword explorer.
+                    Pick a location, then pick a group in the matrix to filter
+                    the keyword list below.
                   </CardDescription>
                 </div>
                 <div className="field">
@@ -1146,26 +1298,27 @@ function Reports({
                 <p>
                   In {location.name}, {format(location.keywords.size)} keywords
                   have reported demand across {format(location.buckets)}{" "}
-                  distinct volume buckets. The highest reported volume is{" "}
+                  different volume levels. The highest monthly searches are{" "}
                   {format(location.maxVolume)}. Google rounds these estimates.
                 </p>
                 <p>
                   {report.brands.length
                     ? `${format(reportPercent(location.branded, location.keywords.size))}% of keywords match your brand list. `
                     : "Add brand names when building the report to measure branded keyword share. "}
+                  Share of keywords by intent:{" "}
                   {reportIntents
                     .map(
                       ([name], index) =>
                         `${name}: ${format(reportPercent(location.intentCounts[index], location.keywords.size))}%`,
                     )
                     .join(" · ")}
-                  . Shares are based on keyword counts.
+                  . These shares count keywords, not searches.
                 </p>
                 <p>
-                  {format(location.quadrants[1])} keywords have high volume and
-                  low advertiser competition. Select that group below to inspect
-                  them. Competition measures advertisers, and bids are
-                  estimates.
+                  {format(location.quadrants[1])} keywords have many searches
+                  but few advertisers. Select "Cheap content wins" in the matrix
+                  to see them. Competition measures advertisers, not search
+                  ranking, and bids are estimates.
                 </p>
               </div>
               {opportunities.length > 0 && (
@@ -1174,11 +1327,19 @@ function Reports({
                   <DataTable
                     label="Keyword opportunities"
                     headers={[
-                      "Signal",
+                      "Why it stands out",
                       "Keyword",
-                      "Search volume",
-                      "Competition",
-                      "High bid (₹)",
+                      { label: "Monthly searches", numeric: true },
+                      {
+                        label: "Competition",
+                        hint: "Advertisers, 0 to 100",
+                        numeric: true,
+                      },
+                      {
+                        label: "High bid (₹)",
+                        hint: "Per click",
+                        numeric: true,
+                      },
                     ]}
                     rows={opportunities.map(({ label, row }) => [
                       label,
@@ -1200,26 +1361,30 @@ function Reports({
                 <div className="brand-breakdown">
                   <h3>Brands in {location.name}</h3>
                   {brandRows.length ? (
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Brand</th>
-                          <th>Keywords</th>
-                          <th>Indicative volume</th>
-                          <th>Share of branded volume</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {brandRows.slice(0, 15).map((row) => (
-                          <tr key={row.brand}>
-                            <td>{row.brand}</td>
-                            <td>{format(row.keywords)}</td>
-                            <td>{format(row.volume)}</td>
-                            <td>{format(row.share)}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      label="Brands in this location"
+                      headers={[
+                        "Brand",
+                        { label: "Keywords", numeric: true },
+                        {
+                          label: "Monthly searches (approx.)",
+                          hint: "Rounded, added up",
+                          numeric: true,
+                        },
+                        {
+                          label: "Share of branded searches",
+                          numeric: true,
+                        },
+                      ]}
+                      rows={brandRows
+                        .slice(0, 15)
+                        .map((row) => [
+                          <span className="capitalize">{row.brand}</span>,
+                          format(row.keywords),
+                          format(row.volume),
+                          `${format(row.share)}%`,
+                        ])}
+                    />
                   ) : (
                     <p className="helper">
                       No brand from your list appears in this location.
@@ -1259,7 +1424,15 @@ function Reports({
                       </p>
                       <DataTable
                         label="Monthly brand trends"
-                        headers={["Month", "Index", "Matched keywords"]}
+                        headers={[
+                          "Month",
+                          {
+                            label: "Search level",
+                            hint: `${location.baselineLabel} = 100`,
+                            numeric: true,
+                          },
+                          { label: "Keywords compared", numeric: true },
+                        ]}
                         rows={brandTrend.map((month) => [
                           month.label,
                           format(month.index),
@@ -1273,8 +1446,9 @@ function Reports({
               <div className="ai-read">
                 <h3>Strategic read (AI)</h3>
                 <p className="helper">
-                  Sends the summary and the keyword examples for {location.name}{" "}
-                  to OpenAI to generate hypotheses. This may incur API charges.
+                  Written automatically when the report is ready, from the
+                  summary and keyword examples for {location.name}. It goes to
+                  OpenAI and costs well under a rupee per report.
                 </p>
                 <Button
                   type="button"
@@ -1320,9 +1494,11 @@ function Reports({
               </div>
               <div className="opportunity-grid">
                 <div>
-                  <h3>Competition matrix</h3>
+                  <h3>How crowded is each keyword?</h3>
                   <p className="helper">
-                    High volume ≥ 1,000 · High competition ≥ 50
+                    Many searches = 1,000 or more a month. Many advertisers =
+                    competition score of 50 or more out of 100. Click a group to
+                    filter the list below.
                   </p>
                   <div className="matrix">
                     {visibleQuadrants.map((name, i) => (
@@ -1343,11 +1519,11 @@ function Reports({
                         <small>
                           {
                             [
-                              "High volume / High competition",
-                              "High volume / Low competition",
-                              "Low volume / High competition",
-                              "Low volume / Low competition",
-                              "Blank or invalid competition",
+                              "Many searches, many advertisers. Expect high costs.",
+                              "Many searches, few advertisers. Content can win cheaply.",
+                              "Few searches, many advertisers. Someone is betting early.",
+                              "Few searches, few advertisers. Questions nobody answers yet.",
+                              "No competition score for these keywords.",
                             ][i]
                           }
                         </small>
@@ -1356,9 +1532,9 @@ function Reports({
                   </div>
                 </div>
                 <div>
-                  <h3>Keywords by volume tier</h3>
+                  <h3>Keywords by monthly searches</h3>
                   <p className="helper">
-                    Count of keywords in each reported range
+                    How many keywords fall in each search-volume range
                   </p>
                   <div className="tiers">
                     {reportTiers.map((tier, i) => (
@@ -1381,7 +1557,7 @@ function Reports({
                   {location.cityState && (
                     <p className="comparison-note">
                       {location.cityState.pairs
-                        ? `${format(location.cityState.index)}% median city/state ratio vs. ${location.cityState.name}, across ${location.cityState.pairs} matched keywords.`
+                        ? `For keywords found in both, this city's searches are a median ${format(location.cityState.index)}% of ${location.cityState.name}'s (${location.cityState.pairs} keywords compared).`
                         : `No shared positive-volume keywords with ${location.cityState.name}.`}
                     </p>
                   )}
@@ -1458,13 +1634,17 @@ function Reports({
                   label="Keyword explorer"
                   headers={[
                     "Keyword",
-                    "Volume",
-                    "Competition",
-                    "Low bid (₹)",
-                    "High bid (₹)",
-                    "Tier",
+                    { label: "Monthly searches", numeric: true },
+                    {
+                      label: "Competition",
+                      hint: "Advertisers, 0 to 100",
+                      numeric: true,
+                    },
+                    { label: "Low bid (₹)", hint: "Per click", numeric: true },
+                    { label: "High bid (₹)", hint: "Per click", numeric: true },
+                    "Volume level",
                     "Brand",
-                    "Intent",
+                    "Search intent",
                   ]}
                   rows={matching
                     .slice(page * 50, (page + 1) * 50)
@@ -1544,7 +1724,10 @@ function Reports({
                 {keywordTrend.monthly.some((value) => value !== null) ? (
                   <DataTable
                     label="Monthly keyword trend"
-                    headers={["Month", "Search volume"]}
+                    headers={[
+                      "Month",
+                      { label: "Monthly searches", numeric: true },
+                    ]}
                     rows={location.monthLabels.map((month, index) => [
                       month,
                       format(keywordTrend.monthly[index]),
@@ -1570,7 +1753,15 @@ function Reports({
               {location.seasonality.some((month) => month.pairs) ? (
                 <DataTable
                   label="Seasonality"
-                  headers={["Month", "Index", "Matched keywords"]}
+                  headers={[
+                    "Month",
+                    {
+                      label: "Search level",
+                      hint: `${location.baselineLabel} = 100`,
+                      numeric: true,
+                    },
+                    { label: "Keywords compared", numeric: true },
+                  ]}
                   rows={location.seasonality.map((month) => [
                     month.label,
                     format(month.index),
@@ -1593,6 +1784,7 @@ function Reports({
 
 export default function App() {
   const [sheet, setSheet] = useState("");
+  const [autoBuild, setAutoBuild] = useState(0);
   const [workspace, setWorkspace] = useState<"collection" | "report">(
     "collection",
   );
@@ -1693,10 +1885,17 @@ export default function App() {
               sheet={sheet}
               setSheet={setSheet}
               openReport={() => setWorkspace("report")}
+              onFilled={(id) => {
+                setSheet(
+                  "https://docs.google.com/spreadsheets/d/" + id + "/edit",
+                );
+                setWorkspace("report");
+                setAutoBuild((n) => n + 1);
+              }}
             />
           </div>
           <div hidden={workspace !== "report"}>
-            <Reports sheet={sheet} setSheet={setSheet} />
+            <Reports sheet={sheet} setSheet={setSheet} autoBuild={autoBuild} />
           </div>
           <footer>
             <span>The Bored Monkey · Keyword Workbench</span>
