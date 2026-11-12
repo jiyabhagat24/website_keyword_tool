@@ -22,7 +22,6 @@ Component provenance and license are in `src/components/watermelon/`. The interf
 
 For a public Sheet, set **General access** to **Anyone with the link → Viewer** and allow downloads. In **Keyword report**, paste the link and select **Build report from public Sheet**. The browser reads Google's workbook export directly. No Google sign-in, Google API key, or n8n key is required.
 
-For private Sheets, enable the Google Sheets API and set `VITE_GOOGLE_CLIENT_ID` to a Google OAuth web client ID. Add the website's origin under **Authorized JavaScript origins**, configure the consent screen for the read-only Sheets scope, and rebuild. Select **Sign in with Google** and use an account that can view the Sheet.
 
 If you configure `VITE_GOOGLE_SHEETS_API_KEY`, the public import uses the Google Sheets API. Restrict the browser API key to your website's HTTP referrers and the Google Sheets API. The report reads standard location and input tabs. Use CSV import for custom location names.
 
@@ -33,7 +32,7 @@ If you configure `VITE_GOOGLE_SHEETS_API_KEY`, the public import uses the Google
 3. Connect the existing Google Sheets OAuth credential to **List Sheet Tabs** and **Read Sheet Tabs**. That Google account needs access to the copied spreadsheet.
 4. To use optional brand detection, connect the existing OpenAI credential to **OpenAI Detect Brands**. Brand detection sends keywords to OpenAI and can incur API charges. The workflow allows up to 5,000 distinct keywords when it is enabled. It uses `gpt-4.1-mini`, which can be changed in that node.
 5. Publish the workflow. Set `VITE_ANALYSIS_WEBHOOK_URL` in your hosting service to the production HTTPS webhook URL and rebuild the website. For local development, place that variable in the gitignored `.env.local` file.
-6. In **Keyword report**, open **Optional AI tools**. Choose **Detect brands and build report** for OpenAI brand detection or **Write strategic read** after a report is available. Review suggested brands before using them for decisions.
+6. In **Keyword report**, choose **Write strategic read** after a report is available. Review suggested brands before using them for decisions.
 
 The workflow reads the standard location and input tabs. Use CSV import for custom location names. The analysis runs after the user starts it and the n8n webhook responds; large sheets and paid brand detection can hit execution, response-size, rate, or proxy timeout limits. Check the n8n execution before retrying after a timeout. The live n8n workflow and its completion behavior must be tested in your instance before relying on automatic handoff.
 
@@ -55,7 +54,6 @@ Bid amounts appear in rupees in the report and CSV. For plain `Low bid` and `Hig
 - **Write strategic read** sends calculated figures and up to 10 keyword examples for the selected location to the analysis workflow. It asks OpenAI (`gpt-4.1-mini`) for 8–12 observation and hypothesis pairs and may incur API charges when the button is pressed.
 - After importing the updated workflow, connect your OpenAI credential to both **OpenAI Detect Brands** and **OpenAI Strategic Read**.
 
-For reports opened directly from Sheets, **Save new Summary tab** is available with `VITE_GOOGLE_CLIENT_ID` configured. Enable the Sheets write scope (`https://www.googleapis.com/auth/spreadsheets`) for the OAuth app. Sign in as an editor when saving. The report creates a new tab with the Summary CSV data in the source workbook.
 
 ## Export for Claude Code
 
