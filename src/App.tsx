@@ -106,23 +106,33 @@ const formatBid = (rupees: number | null) =>
         maximumFractionDigits: 2,
       }).format(rupees);
 
+type TableHeader = string | { label: string; hint?: string; numeric?: boolean };
+
 function DataTable({
   headers,
   rows,
   label,
 }: {
-  headers: string[];
+  headers: TableHeader[];
   rows: ReactNode[][];
   label: string;
 }) {
+  const columns = headers.map((header) =>
+    typeof header === "string" ? { label: header } : header,
+  );
   return (
     <div className="data-table" tabIndex={0} role="region" aria-label={label}>
       <Table>
         <TableHeader>
           <TableRow>
-            {headers.map((header) => (
-              <TableHead key={header} scope="col">
-                {header}
+            {columns.map((column) => (
+              <TableHead
+                key={column.label}
+                scope="col"
+                className={column.numeric ? "num" : undefined}
+              >
+                {column.label}
+                {column.hint && <span className="th-hint">{column.hint}</span>}
               </TableHead>
             ))}
           </TableRow>
@@ -131,7 +141,12 @@ function DataTable({
           {rows.map((row, index) => (
             <TableRow key={index}>
               {row.map((cell, i) => (
-                <TableCell key={i}>{cell}</TableCell>
+                <TableCell
+                  key={i}
+                  className={columns[i]?.numeric ? "num" : undefined}
+                >
+                  {cell}
+                </TableCell>
               ))}
             </TableRow>
           ))}
@@ -986,7 +1001,10 @@ function Reports({
               <h2 id="report-title" tabIndex={-1} ref={resultsRef}>
                 Your search landscape
               </h2>
-              <p>Google rounds search volumes. Compare tiers and buckets.</p>
+              <p>
+                Google rounds search volumes, so compare levels rather than
+                exact numbers.
+              </p>
             </div>
             <div className="sheet-report-actions">
               <DownloadButton
@@ -1013,19 +1031,21 @@ function Reports({
               <CardContent>
                 <span>Locations compared</span>
                 <strong>{report.locations.length}</strong>
-                <small>From your imported exports</small>
+                <small>Location tabs read from your data</small>
               </CardContent>
             </Card>
             <Card>
               <CardContent>
                 <span>Keywords with demand</span>
                 <strong>{format(report.unique)}</strong>
-                <small>Distinct across all locations</small>
+                <small>
+                  Different keywords, counted once across all locations
+                </small>
               </CardContent>
             </Card>
             <Card>
               <CardContent>
-                <span>Seed hit rate</span>
+                <span>Starting keywords found</span>
                 <strong>
                   {report.seedCount
                     ? format(reportPercent(report.seedHits, report.seedCount)) +
@@ -1034,8 +1054,8 @@ function Reports({
                 </strong>
                 <small>
                   {report.seedCount
-                    ? `${report.seedHits} of ${report.seedCount} exact matches`
-                    : "Add an input CSV to measure"}
+                    ? `${report.seedHits} of ${report.seedCount} of your starting keywords have search data`
+                    : "Add the Keyword input tab to measure this"}
                 </small>
               </CardContent>
             </Card>
@@ -1046,7 +1066,7 @@ function Reports({
               <CardDescription>
                 {report.locations.filter((item) => item.keywords.size <= 1)
                   .length
-                  ? "Zero or one keyword with demand in " +
+                  ? "Almost no data (one keyword or none) in " +
                     report.locations
                       .filter((item) => item.keywords.size <= 1)
                       .map((item) => item.name)
@@ -1060,10 +1080,26 @@ function Reports({
                 label="Demand by location"
                 headers={[
                   "Location",
-                  "Keywords with demand",
-                  "Volume buckets",
-                  "Peak volume",
-                  "Seed hits",
+                  {
+                    label: "Keywords with demand",
+                    hint: "Searched monthly",
+                    numeric: true,
+                  },
+                  {
+                    label: "Volume levels",
+                    hint: "Distinct values",
+                    numeric: true,
+                  },
+                  {
+                    label: "Top monthly searches",
+                    hint: "Highest here",
+                    numeric: true,
+                  },
+                  {
+                    label: "Starting keywords",
+                    hint: "Found with data",
+                    numeric: true,
+                  },
                 ]}
                 rows={report.locations.map((item) => [
                   <span className="location-name">
@@ -1073,7 +1109,7 @@ function Reports({
                   format(item.keywords.size),
                   format(item.buckets),
                   format(item.maxVolume),
-                  report.seedCount ? item.seedHits : "—",
+                  report.seedCount ? format(item.seedHits) : "—",
                 ])}
               />
               <details className="csv-alternative">
@@ -1087,9 +1123,17 @@ function Reports({
                   label="Regional volume shares"
                   headers={[
                     "Location",
-                    "Branded",
-                    ...reportIntents.map(([name]) => name),
-                    "City vs. state",
+                    { label: "Branded", hint: "% of searches", numeric: true },
+                    ...reportIntents.map(([name]) => ({
+                      label: name,
+                      hint: "% of searches",
+                      numeric: true,
+                    })),
+                    {
+                      label: "City's share of its state",
+                      hint: "Cities only",
+                      numeric: true,
+                    },
                   ]}
                   rows={report.locations.map((item) => {
                     const shares = reportVolumeShares(item);
@@ -1114,7 +1158,8 @@ function Reports({
                 <div>
                   <CardTitle>Find an opportunity</CardTitle>
                   <CardDescription>
-                    Choose a group below to filter the keyword explorer.
+                    Pick a location, then pick a group in the matrix to filter
+                    the keyword list below.
                   </CardDescription>
                 </div>
                 <div className="field">
@@ -1146,26 +1191,27 @@ function Reports({
                 <p>
                   In {location.name}, {format(location.keywords.size)} keywords
                   have reported demand across {format(location.buckets)}{" "}
-                  distinct volume buckets. The highest reported volume is{" "}
+                  different volume levels. The highest monthly searches are{" "}
                   {format(location.maxVolume)}. Google rounds these estimates.
                 </p>
                 <p>
                   {report.brands.length
                     ? `${format(reportPercent(location.branded, location.keywords.size))}% of keywords match your brand list. `
                     : "Add brand names when building the report to measure branded keyword share. "}
+                  Share of keywords by intent:{" "}
                   {reportIntents
                     .map(
                       ([name], index) =>
                         `${name}: ${format(reportPercent(location.intentCounts[index], location.keywords.size))}%`,
                     )
                     .join(" · ")}
-                  . Shares are based on keyword counts.
+                  . These shares count keywords, not searches.
                 </p>
                 <p>
-                  {format(location.quadrants[1])} keywords have high volume and
-                  low advertiser competition. Select that group below to inspect
-                  them. Competition measures advertisers, and bids are
-                  estimates.
+                  {format(location.quadrants[1])} keywords have many searches
+                  but few advertisers. Select "Cheap content wins" in the matrix
+                  to see them. Competition measures advertisers, not search
+                  ranking, and bids are estimates.
                 </p>
               </div>
               {opportunities.length > 0 && (
@@ -1174,11 +1220,19 @@ function Reports({
                   <DataTable
                     label="Keyword opportunities"
                     headers={[
-                      "Signal",
+                      "Why it stands out",
                       "Keyword",
-                      "Search volume",
-                      "Competition",
-                      "High bid (₹)",
+                      { label: "Monthly searches", numeric: true },
+                      {
+                        label: "Competition",
+                        hint: "Advertisers, 0 to 100",
+                        numeric: true,
+                      },
+                      {
+                        label: "High bid (₹)",
+                        hint: "Per click",
+                        numeric: true,
+                      },
                     ]}
                     rows={opportunities.map(({ label, row }) => [
                       label,
@@ -1200,26 +1254,30 @@ function Reports({
                 <div className="brand-breakdown">
                   <h3>Brands in {location.name}</h3>
                   {brandRows.length ? (
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Brand</th>
-                          <th>Keywords</th>
-                          <th>Indicative volume</th>
-                          <th>Share of branded volume</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {brandRows.slice(0, 15).map((row) => (
-                          <tr key={row.brand}>
-                            <td>{row.brand}</td>
-                            <td>{format(row.keywords)}</td>
-                            <td>{format(row.volume)}</td>
-                            <td>{format(row.share)}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      label="Brands in this location"
+                      headers={[
+                        "Brand",
+                        { label: "Keywords", numeric: true },
+                        {
+                          label: "Monthly searches (approx.)",
+                          hint: "Rounded, added up",
+                          numeric: true,
+                        },
+                        {
+                          label: "Share of branded searches",
+                          numeric: true,
+                        },
+                      ]}
+                      rows={brandRows
+                        .slice(0, 15)
+                        .map((row) => [
+                          <span className="capitalize">{row.brand}</span>,
+                          format(row.keywords),
+                          format(row.volume),
+                          `${format(row.share)}%`,
+                        ])}
+                    />
                   ) : (
                     <p className="helper">
                       No brand from your list appears in this location.
@@ -1259,7 +1317,15 @@ function Reports({
                       </p>
                       <DataTable
                         label="Monthly brand trends"
-                        headers={["Month", "Index", "Matched keywords"]}
+                        headers={[
+                          "Month",
+                          {
+                            label: "Search level",
+                            hint: `${location.baselineLabel} = 100`,
+                            numeric: true,
+                          },
+                          { label: "Keywords compared", numeric: true },
+                        ]}
                         rows={brandTrend.map((month) => [
                           month.label,
                           format(month.index),
@@ -1320,9 +1386,11 @@ function Reports({
               </div>
               <div className="opportunity-grid">
                 <div>
-                  <h3>Competition matrix</h3>
+                  <h3>How crowded is each keyword?</h3>
                   <p className="helper">
-                    High volume ≥ 1,000 · High competition ≥ 50
+                    Many searches = 1,000 or more a month. Many advertisers =
+                    competition score of 50 or more out of 100. Click a group to
+                    filter the list below.
                   </p>
                   <div className="matrix">
                     {visibleQuadrants.map((name, i) => (
@@ -1343,11 +1411,11 @@ function Reports({
                         <small>
                           {
                             [
-                              "High volume / High competition",
-                              "High volume / Low competition",
-                              "Low volume / High competition",
-                              "Low volume / Low competition",
-                              "Blank or invalid competition",
+                              "Many searches, many advertisers. Expect high costs.",
+                              "Many searches, few advertisers. Content can win cheaply.",
+                              "Few searches, many advertisers. Someone is betting early.",
+                              "Few searches, few advertisers. Questions nobody answers yet.",
+                              "No competition score for these keywords.",
                             ][i]
                           }
                         </small>
@@ -1356,9 +1424,9 @@ function Reports({
                   </div>
                 </div>
                 <div>
-                  <h3>Keywords by volume tier</h3>
+                  <h3>Keywords by monthly searches</h3>
                   <p className="helper">
-                    Count of keywords in each reported range
+                    How many keywords fall in each search-volume range
                   </p>
                   <div className="tiers">
                     {reportTiers.map((tier, i) => (
@@ -1381,7 +1449,7 @@ function Reports({
                   {location.cityState && (
                     <p className="comparison-note">
                       {location.cityState.pairs
-                        ? `${format(location.cityState.index)}% median city/state ratio vs. ${location.cityState.name}, across ${location.cityState.pairs} matched keywords.`
+                        ? `For keywords found in both, this city's searches are a median ${format(location.cityState.index)}% of ${location.cityState.name}'s (${location.cityState.pairs} keywords compared).`
                         : `No shared positive-volume keywords with ${location.cityState.name}.`}
                     </p>
                   )}
@@ -1458,13 +1526,17 @@ function Reports({
                   label="Keyword explorer"
                   headers={[
                     "Keyword",
-                    "Volume",
-                    "Competition",
-                    "Low bid (₹)",
-                    "High bid (₹)",
-                    "Tier",
+                    { label: "Monthly searches", numeric: true },
+                    {
+                      label: "Competition",
+                      hint: "Advertisers, 0 to 100",
+                      numeric: true,
+                    },
+                    { label: "Low bid (₹)", hint: "Per click", numeric: true },
+                    { label: "High bid (₹)", hint: "Per click", numeric: true },
+                    "Volume level",
                     "Brand",
-                    "Intent",
+                    "Search intent",
                   ]}
                   rows={matching
                     .slice(page * 50, (page + 1) * 50)
@@ -1544,7 +1616,10 @@ function Reports({
                 {keywordTrend.monthly.some((value) => value !== null) ? (
                   <DataTable
                     label="Monthly keyword trend"
-                    headers={["Month", "Search volume"]}
+                    headers={[
+                      "Month",
+                      { label: "Monthly searches", numeric: true },
+                    ]}
                     rows={location.monthLabels.map((month, index) => [
                       month,
                       format(keywordTrend.monthly[index]),
@@ -1570,7 +1645,15 @@ function Reports({
               {location.seasonality.some((month) => month.pairs) ? (
                 <DataTable
                   label="Seasonality"
-                  headers={["Month", "Index", "Matched keywords"]}
+                  headers={[
+                    "Month",
+                    {
+                      label: "Search level",
+                      hint: `${location.baselineLabel} = 100`,
+                      numeric: true,
+                    },
+                    { label: "Keywords compared", numeric: true },
+                  ]}
                   rows={location.seasonality.map((month) => [
                     month.label,
                     format(month.index),
