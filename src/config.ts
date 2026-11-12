@@ -4,6 +4,9 @@ export const WEBHOOKS = {
   keywords:
     "https://n8n.srv1799142.hstgr.cloud/webhook/a50bc329-6f29-4833-9d72-306d7bacbb17",
 };
+// Public address of the keyword report workflow. VITE_ANALYSIS_WEBHOOK_URL overrides it.
+export const ANALYSIS_WEBHOOK_URL =
+  "https://n8n.srv1799142.hstgr.cloud/webhook/keyword-report-analysis";
 export const SHEETS = {
   website:
     "https://docs.google.com/spreadsheets/d/1NEymr4St_ZgL5UUW_h4TGO8xbcy20Bu7V9edCuuIWkU/copy",

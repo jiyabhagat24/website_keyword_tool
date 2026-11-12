@@ -165,7 +165,7 @@
           "parameters": [
             {
               "name": "developer-token",
-              "value": "hoTH9Xi3q3zzd4OxTcoU9A"
+              "value": "YOUR_GOOGLE_ADS_DEVELOPER_TOKEN"
             }
           ]
         },
@@ -243,7 +243,7 @@
           "parameters": [
             {
               "name": "developer-token",
-              "value": "hoTH9Xi3q3zzd4OxTcoU9A"
+              "value": "YOUR_GOOGLE_ADS_DEVELOPER_TOKEN"
             }
           ]
         },

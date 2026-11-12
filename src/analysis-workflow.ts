@@ -1,3 +1,4 @@
+import { ANALYSIS_WEBHOOK_URL } from "./config";
 export interface AnalysisResponse {
   sources: { name: string; text: string }[];
   brands: string[];
@@ -9,7 +10,8 @@ export async function runAnalysisWorkflow(
   sheetId: string,
   detectBrands: boolean,
 ): Promise<AnalysisResponse> {
-  const endpoint = import.meta.env.VITE_ANALYSIS_WEBHOOK_URL?.trim();
+  const endpoint =
+    import.meta.env.VITE_ANALYSIS_WEBHOOK_URL?.trim() || ANALYSIS_WEBHOOK_URL;
   if (!endpoint)
     throw new Error(
       "The analysis workflow URL is not configured. Set VITE_ANALYSIS_WEBHOOK_URL when building the website.",
@@ -77,7 +79,8 @@ export interface StrategicRead {
 export async function requestStrategicRead(
   facts: unknown,
 ): Promise<StrategicRead> {
-  const endpoint = import.meta.env.VITE_ANALYSIS_WEBHOOK_URL?.trim();
+  const endpoint =
+    import.meta.env.VITE_ANALYSIS_WEBHOOK_URL?.trim() || ANALYSIS_WEBHOOK_URL;
   if (!endpoint)
     throw new Error(
       "The analysis workflow URL is not configured. Set VITE_ANALYSIS_WEBHOOK_URL when building the website.",
