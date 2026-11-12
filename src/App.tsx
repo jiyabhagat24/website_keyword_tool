@@ -70,6 +70,7 @@ import {
 } from "@/components/watermelon/native-select";
 import { WEBHOOKS, SHEETS, LOCATIONS, MONTHS } from "./config";
 import {
+  googleSignInConfigured,
   loadGoogleIdentity,
   readGoogleSheet,
   sheetIdFromInput,
@@ -174,7 +175,7 @@ function Guide({ report = false }: { report?: boolean }) {
     ? [
         [
           "Connect your sheet",
-          "Paste a public Sheet link or sign in with Google to read a private Sheet you can access.",
+          "Paste a Sheet link shared with Anyone with the link as a Viewer.",
         ],
         [
           "Choose brand names",
@@ -803,8 +804,8 @@ function Reports({
                   disabled={busy}
                 />
                 <p>
-                  For a private Sheet, sign in with a Google account that can
-                  view it.
+                  Set General access to Anyone with the link. Viewer access is
+                  enough to build the report.
                 </p>
               </div>
               <div className="field">
@@ -835,14 +836,16 @@ function Reports({
                   {busy ? <Loader2 className="spinner" /> : <ArrowRight />}
                   {busy ? "Reading Sheet" : "Build report from public Sheet"}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => buildSheet("private")}
-                  disabled={busy || aiBusy}
-                >
-                  Sign in with Google
-                </Button>
+                {googleSignInConfigured && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => buildSheet("private")}
+                    disabled={busy || aiBusy}
+                  >
+                    Sign in with Google
+                  </Button>
+                )}
               </div>
             </div>
             <details className="csv-alternative" ref={aiSettingsRef}>

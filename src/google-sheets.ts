@@ -3,6 +3,10 @@ import { LOCATIONS } from "./config";
 const sheetsReadScope = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const publicApiKey = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY?.trim();
 const oauthClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
+const locations = new Set(LOCATIONS.map((name) => name.toLowerCase()));
+const inputTabs = new Set(["keyword input", "website input"]);
+
+export const googleSignInConfigured = Boolean(oauthClientId);
 
 type GoogleTokenClient = {
   requestAccessToken: () => void;
@@ -75,15 +79,65 @@ export function sheetIdFromInput(value: string): string | null {
   return match?.[1] ?? (/^[\w-]{16,}$/.test(text) ? text : null);
 }
 
+function isLocationTab(title: string): boolean {
+  return locations.has(title.trim().toLowerCase());
+}
+
+function isReportTab(title: string): boolean {
+  return isLocationTab(title) || inputTabs.has(title.trim().toLowerCase());
+}
+
+function csvSource(title: string, rows: unknown[][]) {
+  const text = rows
+    .map((row) =>
+      row
+        .map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`)
+        .join(","),
+    )
+    .join("\r\n");
+  return { name: `${title}.csv`, text };
+}
+
+async function readPublicWorkbook(sheetId: string) {
+  const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/export?format=xlsx`;
+  const accessMessage =
+    "Google could not download this Sheet. Check the link and set General access to Anyone with the link (Viewer), or import CSV files.";
+  let workbook: Blob;
+  try {
+    const response = await fetch(url, {
+      credentials: "omit",
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!response.ok) throw new Error(accessMessage);
+    workbook = await response.blob();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError")
+      throw new Error(
+        "Google took too long to download this Sheet. Try again.",
+      );
+    throw new Error(accessMessage);
+  }
+  if (workbook.type.startsWith("text/html")) throw new Error(accessMessage);
+
+  const { default: readWorkbook } = await import("read-excel-file/browser");
+  const tabs = await readWorkbook(workbook).catch(() => {
+    throw new Error(
+      "Google's workbook export could not be read. Try importing CSV files.",
+    );
+  });
+  if (!tabs.some(({ sheet }) => isLocationTab(sheet)))
+    throw new Error("No recognized location tabs were found in this Sheet.");
+  return tabs
+    .filter(({ sheet }) => isReportTab(sheet))
+    .map(({ sheet, data }) => csvSource(sheet, data));
+}
+
 export async function readGoogleSheet(
   sheetId: string,
   signedIn: boolean,
 ): Promise<{ name: string; text: string }[]> {
+  if (!signedIn && !publicApiKey) return readPublicWorkbook(sheetId);
   const token = signedIn ? await requestReadToken() : undefined;
-  if (!token && !publicApiKey)
-    throw new Error(
-      "Public Sheet access is not configured. Try Sign in with Google.",
-    );
 
   const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}`;
   const signal = AbortSignal.timeout(120_000);
@@ -110,15 +164,10 @@ export async function readGoogleSheet(
   const metadata = await get<{
     sheets?: { properties?: { title?: string } }[];
   }>("", new URLSearchParams({ fields: "sheets(properties(title))" }));
-  const locations = new Set(LOCATIONS.map((name) => name.toLowerCase()));
-  const inputTabs = new Set(["keyword input", "website input"]);
   const titles = (metadata.sheets ?? [])
     .map((sheet) => sheet.properties?.title)
-    .filter((title): title is string => {
-      const name = title?.trim().toLowerCase();
-      return Boolean(name && (locations.has(name) || inputTabs.has(name)));
-    });
-  if (!titles.some((title) => locations.has(title.trim().toLowerCase())))
+    .filter((title): title is string => Boolean(title && isReportTab(title)));
+  if (!titles.some(isLocationTab))
     throw new Error("No recognized location tabs were found in this Sheet.");
 
   const sources: { name: string; text: string }[] = [];
@@ -135,16 +184,8 @@ export async function readGoogleSheet(
     );
     if (data.valueRanges?.length !== batch.length)
       throw new Error("Google Sheets did not return every requested tab.");
-    for (const [index, range] of data.valueRanges.entries()) {
-      const text = (range.values ?? [])
-        .map((row) =>
-          row
-            .map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`)
-            .join(","),
-        )
-        .join("\r\n");
-      sources.push({ name: batch[index] + ".csv", text });
-    }
+    for (const [index, range] of data.valueRanges.entries())
+      sources.push(csvSource(batch[index], range.values ?? []));
   }
   return sources;
 }
