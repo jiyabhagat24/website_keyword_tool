@@ -47,6 +47,8 @@ The workflow reads the standard location and input tabs. Use CSV import for cust
 
 The report processes the CSVs in the browser. It uses distinct positive-volume keywords, counts volume tiers, and uses 1,000 search volume and 50 competition index as the quadrant thresholds. Google rounds search volumes, so the report shows volume buckets and peak values. Seasonality uses the median keyword-level ratio to December 2025 where dated month columns exist. City/state comparisons use keywords found with positive volume in both exported tabs.
 
+Bid amounts appear in rupees in the report and CSV. For plain `Low bid` and `High bid` headers, the report reads fractional or ₹-prefixed bids as a sign that both columns use rupees. With whole numbers only, it defaults to raw Google Ads micros. Use `Low bid (₹)` and `High bid (₹)` to specify rupees, or add `(micros)` to specify raw micros.
+
 ## Brand breakdown and strategic read
 
 - With a brand list, each location shows a table of brands (keywords, indicative volume, share of branded volume). Brands that appear in no location are listed under the table and in the CSV download. Volumes add up Google's rounded values, so they are a guide only.

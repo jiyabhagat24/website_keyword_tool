@@ -95,15 +95,15 @@ type Mode = "website" | "keywords";
 type Report = ReturnType<typeof reportBuild>;
 const format = (value: number | null) =>
   value === null ? "—" : reportNumber.format(value);
-const formatBid = (micros: number | null) =>
-  micros === null
+const formatBid = (rupees: number | null) =>
+  rupees === null
     ? "—"
     : new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(micros / 1_000_000);
+      }).format(rupees);
 
 function DataTable({
   headers,
@@ -623,6 +623,9 @@ function Reports({
     void loadGoogleIdentity().catch(() => {});
   }, []);
   const location = report?.locations[locationIndex];
+  const visibleQuadrants = location?.quadrants.at(-1)
+    ? reportQuadrants
+    : reportQuadrants.slice(0, -1);
   const matching = useMemo(
     () =>
       location
@@ -769,8 +772,8 @@ function Reports({
         row.keyword,
         row.volume,
         row.competition,
-        row.lowBidMicros === null ? "" : row.lowBidMicros / 1_000_000,
-        row.highBidMicros === null ? "" : row.highBidMicros / 1_000_000,
+        row.lowBidInr,
+        row.highBidInr,
         reportTiers[row.tier],
         reportQuadrants[row.quadrant],
         row.brand,
@@ -1237,7 +1240,7 @@ function Reports({
                     High volume ≥ 1,000 · High competition ≥ 50
                   </p>
                   <div className="matrix">
-                    {reportQuadrants.map((name, i) => (
+                    {visibleQuadrants.map((name, i) => (
                       <button
                         key={name}
                         type="button"
@@ -1366,8 +1369,8 @@ function Reports({
                       row.keyword,
                       format(row.volume),
                       format(row.competition),
-                      formatBid(row.lowBidMicros),
-                      formatBid(row.highBidMicros),
+                      formatBid(row.lowBidInr),
+                      formatBid(row.highBidInr),
                       reportTiers[row.tier],
                       row.brand ? (
                         <Badge variant="secondary">{row.brand}</Badge>

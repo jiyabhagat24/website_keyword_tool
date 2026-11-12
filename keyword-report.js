@@ -125,6 +125,16 @@ function reportReadNumber(raw) {
   return Number.isFinite(value) ? value : null;
 }
 
+function reportReadBid(raw, header, unmarkedBidsInRupees) {
+  const text = String(raw ?? "").trim();
+  const amount = reportReadNumber(text.replace(/^₹\s*/, ""));
+  if (amount === null) return null;
+  if (text.startsWith("₹") || / \((?:₹|inr)\)$/.test(header)) return amount;
+  if (header.endsWith(" (micros)") || !unmarkedBidsInRupees)
+    return amount / 1_000_000;
+  return amount;
+}
+
 function reportMedian(values) {
   if (!values.length) return null;
   values.sort((left, right) => left - right);
@@ -182,12 +192,27 @@ function reportReadLocation(name, rows, getTags) {
   );
   const competitionColumn = columns.indexOf("competition index");
   const lowBidColumn = columns.findIndex((label) =>
-    ["low big", "low bid"].includes(label),
+    /^low (?:bid|big)(?: \((?:₹|inr|micros)\))?$/.test(label),
   );
-  const highBidColumn = columns.indexOf("high bid");
+  const highBidColumn = columns.findIndex((label) =>
+    /^high bid(?: \((?:₹|inr|micros)\))?$/.test(label),
+  );
   if (rows.length && (keywordColumn < 0 || volumeColumn < 0)) {
     throw new Error("Expected Keyword and Search volume columns.");
   }
+  // The older workflows write integer micros into unlabelled bid columns.
+  const unmarkedBidColumns = [lowBidColumn, highBidColumn].filter((index) =>
+    ["low big", "low bid", "high bid"].includes(columns[index]),
+  );
+  const unmarkedBidsInRupees = records.some((row) =>
+    unmarkedBidColumns.some((index) => {
+      const text = (row[index] ?? "").trim();
+      const amount = reportReadNumber(text);
+      return (
+        text.startsWith("₹") || (amount !== null && !Number.isInteger(amount))
+      );
+    }),
+  );
   const months = columns
     .flatMap((label, index) => {
       const match = label.match(/^([a-z]+) (\d{4})$/);
@@ -221,8 +246,16 @@ function reportReadLocation(name, rows, getTags) {
       keyword,
       volume,
       competition,
-      lowBidMicros: reportReadNumber(row[lowBidColumn]),
-      highBidMicros: reportReadNumber(row[highBidColumn]),
+      lowBidInr: reportReadBid(
+        row[lowBidColumn],
+        columns[lowBidColumn] ?? "",
+        unmarkedBidsInRupees,
+      ),
+      highBidInr: reportReadBid(
+        row[highBidColumn],
+        columns[highBidColumn] ?? "",
+        unmarkedBidsInRupees,
+      ),
       tier,
       quadrant,
       ...tags,
