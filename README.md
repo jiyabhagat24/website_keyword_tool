@@ -27,6 +27,8 @@ If you configure `VITE_GOOGLE_SHEETS_API_KEY`, the public import uses the Google
 
 ## Configure optional AI tools in n8n
 
+For TBMSOV classification, attach a read-only Postgres credential for the **TBMSOV** project to **Read SOV Category Brands** in the analysis workflow. The credential needs `SELECT` access to `public.product_brands` under the project's existing access policies. The query reads brand names for the selected category using a parameter. Choose an **SOV product category** before starting collection to include it in automatic analysis, or choose one in the report to classify a batch manually.
+
 1. Import `workflows/Keyword Report - n8n Analysis.json` as a new n8n workflow. It is inactive when imported.
 2. The **Analysis Webhook** has no access key, so anyone who knows its URL can call it and use your OpenAI credits. Replace `https://YOUR-WEBSITE-ORIGIN` in the webhook's allowed origins with the exact website origin, and add the key check back (Header Auth `X-Report-Key`) if the URL is ever shared widely.
 3. Connect the existing Google Sheets OAuth credential to **List Sheet Tabs** and **Read Sheet Tabs**. That Google account needs access to the copied spreadsheet.
@@ -46,7 +48,7 @@ For automatic analysis, deploy the matching updated collection workflow JSON fil
 
 The **Keyword classification** section shows distinct keyword counts and shares by brand type and intent for the selected location. Click a category to open the matching keywords. The report uses labels from **Keyword input** and **Keyword Suggestion** when available, then falls back to the brand list and phrase rules. One keyword can match several intent rules. The Summary CSV includes the classification breakdown for each location.
 
-For reports with a **Website Input** tab, **Classify website keywords with AI** sends domain names and up to 100 unprocessed keywords per click to the analysis workflow. It suggests own-brand, competitor, generic, and intent labels in the report and exports. Uncertain brand labels remain unclassified. The analysis workflow must include the `classify_website` mode from the current workflow export. AI calls may incur charges.
+For reports with a **Website Input** tab or a selected SOV category, **Classify keywords with AI** sends up to 100 unprocessed keywords per click to the analysis workflow, along with any source domains and the selected category. The workflow reads that category's brand names from TBMSOV. It suggests brand and intent labels in the report and exports. Uncertain brand labels remain unclassified. AI calls may incur charges.
 
 The report processes the CSVs in the browser. It uses distinct positive-volume keywords, counts volume tiers, and uses 1,000 search volume and 50 competition index as the quadrant thresholds. Volume shares use Google's rounded figures and can overlap for intent tags. Location and brand trends use the median keyword-level ratio to December 2025, or the earliest dated column when December 2025 is absent. City/state comparisons use keywords found with positive volume in both exported tabs.
 

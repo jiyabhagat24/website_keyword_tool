@@ -484,7 +484,7 @@ function reportBuild(
             ? "Generic"
             : brandName || intent === "branded" || hit
               ? "Branded"
-              : ai?.brandType === "Own brand"
+              : ai?.brandType === "Own brand" || ai?.brandType === "Branded"
                 ? "Branded"
                 : ai?.brandType === "Competitor brand"
                   ? "Competitor brand"
@@ -843,11 +843,15 @@ function reportFacts(report, selectedLocation) {
         keyword: row.keyword.slice(0, 100),
         pct: round(row.pct),
       })),
-      ...(report.websiteHosts.length && {
-        keywordClassification: reportClassification(focus).map(
-          ({ group, label, count }) => ({ group, label, count }),
-        ),
-      }),
+      keywordClassification: reportClassification(focus)
+        .filter(({ count }) => count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 24)
+        .map(({ group, label, count }) => ({
+          group,
+          label: label.slice(0, 80),
+          count,
+        })),
       examples: reportOpportunities(focus).map(({ label, row }) => ({
         signal: label,
         keyword: row.keyword.slice(0, 200),

@@ -34,7 +34,7 @@ function monthOrder(label: string) {
   return Number(year) * 12 + MONTHS.indexOf(month);
 }
 
-function keywordRows(report: Report) {
+export function keywordRows(report: Report, locations = report.locations) {
   const labels = [
     ...new Set(report.locations.flatMap((location) => location.monthLabels)),
   ].sort((a, b) => monthOrder(a) - monthOrder(b));
@@ -54,7 +54,7 @@ function keywordRows(report: Report) {
       ...labels,
     ],
   ];
-  for (const location of report.locations) {
+  for (const location of locations) {
     const at = new Map(location.monthLabels.map((l, i) => [l, i]));
     for (const row of location.keywords.values()) {
       rows.push([

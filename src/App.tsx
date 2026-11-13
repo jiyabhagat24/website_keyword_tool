@@ -14,7 +14,6 @@ import {
   BarChart3,
   Check,
   CheckCircle2,
-  ChevronLeft,
   ChevronRight,
   CircleHelp,
   Copy,
@@ -25,7 +24,6 @@ import {
   Loader2,
   LockKeyhole,
   MapPin,
-  Search,
   SlidersHorizontal,
   Sparkles,
   UploadCloud,
@@ -44,14 +42,6 @@ import { Label } from "@/components/watermelon/label";
 import { Switch } from "@/components/watermelon/switch";
 import { Checkbox } from "@/components/watermelon/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/watermelon/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/watermelon/table";
 import { Badge } from "@/components/watermelon/badge";
 import {
   Accordion,
@@ -75,96 +65,74 @@ import {
   requestStrategicRead,
 } from "./analysis-workflow";
 import type { StrategicRead, WebsiteKeywordLabel } from "./analysis-workflow";
-import { buildClaudeBundle } from "./claude-bundle";
+import { buildClaudeBundle, keywordRows } from "./claude-bundle";
+import ReportDashboard from "./ReportDashboard";
 import { askNotificationPermission, notifyUser } from "./notify";
 import { collectionProgress } from "./watch-sheet";
 import {
   reportBuild,
-  reportBrandRows,
-  reportClassification,
-  reportKeywordCategories,
-  reportKeywordIntents,
-  reportVolumeShares,
-  reportOpportunities,
-  reportTrendMovers,
-  reportPeak,
   reportFacts,
   reportExportRows,
   reportSafeCsv,
-  reportPercent,
-  reportNormalize,
   reportNumber,
-  reportTiers,
-  reportQuadrants,
-  reportIntents,
 } from "../keyword-report";
 
 type Mode = "website" | "keywords";
-type Report = ReturnType<typeof reportBuild>;
-const format = (value: number | null) =>
-  value === null ? "—" : reportNumber.format(value);
-const formatPercent = (value: number | null) =>
-  value === null ? "—" : `${format(value)}%`;
-const formatBid = (rupees: number | null) =>
-  rupees === null
-    ? "—"
-    : new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(rupees);
+const sovCategories = [
+  "air conditioner",
+  "air fryer",
+  "ceiling fans",
+  "cold press juicer",
+  "dishwasher",
+  "Male Skincare",
+  "mattress",
+  "microwave",
+  "mixer grinder",
+  "nutri blender",
+  "office & gaming chairs",
+  "Oven microwave Toaster",
+  "pedestal fan",
+  "recliner",
+  "small plants",
+  "smart door locks",
+  "tablets",
+  "washing machine",
+  "Water purifier",
+];
 
-type TableHeader = string | { label: string; hint?: string; numeric?: boolean };
-
-function DataTable({
-  headers,
-  rows,
-  label,
+function SovCategory({
+  id,
+  value,
+  onChange,
+  disabled,
 }: {
-  headers: TableHeader[];
-  rows: ReactNode[][];
-  label: string;
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
 }) {
-  const columns = headers.map((header) =>
-    typeof header === "string" ? { label: header } : header,
-  );
   return (
-    <div className="data-table" tabIndex={0} role="region" aria-label={label}>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((column) => (
-              <TableHead
-                key={column.label}
-                scope="col"
-                className={column.numeric ? "num" : undefined}
-              >
-                {column.label}
-                {column.hint && <span className="th-hint">{column.hint}</span>}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row, index) => (
-            <TableRow key={index}>
-              {row.map((cell, i) => (
-                <TableCell
-                  key={i}
-                  className={columns[i]?.numeric ? "num" : undefined}
-                >
-                  {cell}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="field">
+      <Label htmlFor={id}>SOV product category</Label>
+      <NativeSelect
+        id={id}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <NativeSelectOption value="">No SOV category</NativeSelectOption>
+        {sovCategories.map((category) => (
+          <NativeSelectOption key={category} value={category}>
+            {category}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
     </div>
   );
 }
-
+type Report = ReturnType<typeof reportBuild>;
+const format = (value: number | null) =>
+  value === null ? "—" : reportNumber.format(value);
 function DownloadButton({
   children,
   onClick,
@@ -194,26 +162,6 @@ function downloadCsv(name: string, rows: unknown[][]) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-
-const intentMeaning: Record<string, string> = {
-  Branded: "Contains a brand name",
-  "Competitor brand": "Contains another brand's name",
-  Generic: "No brand: a plain product or category term",
-  "Best / Review": "Looking for the best option or reviews",
-  "Price / Buy": "Price, deals or buying online",
-  Question: "Asking something, such as is it safe",
-  "How-to": "Wants to learn how to use or do something",
-  Concern: "A skin or hair problem",
-  Ingredient: "An active ingredient",
-  Comparison: "Comparing two or more options",
-  Local: "Near me or nearby",
-  Price: "Checking prices, deals or how to buy",
-  Doubt: "Checking safety, benefits or other questions",
-  Recipe: "Looking for a recipe",
-  Usage: "Learning how to use a product",
-  "Brand unclassified": "Brand status is unknown",
-  "No intent tag": "No specific intent was matched",
-};
 
 function downloadClaudeBundle(
   report: Parameters<typeof buildClaudeBundle>[0],
@@ -298,11 +246,15 @@ function Guide({ report = false }: { report?: boolean }) {
 }
 
 function Collection({
+  sovCategory,
+  setSovCategory,
   sheet,
   setSheet,
   openReport,
   onFilled,
 }: {
+  sovCategory: string;
+  setSovCategory: (value: string) => void;
   sheet: string;
   setSheet: (value: string) => void;
   openReport: () => void;
@@ -534,6 +486,12 @@ function Collection({
                   automation account.
                 </p>
               </div>
+              <SovCategory
+                id="collection-sov-category"
+                value={sovCategory}
+                onChange={setSovCategory}
+                disabled={Boolean(watchTarget)}
+              />
               {mode === "keywords" && (
                 <div className="field">
                   <Label htmlFor="collection-brands">
@@ -761,10 +719,14 @@ function Collection({
 }
 
 function Reports({
+  sovCategory,
+  setSovCategory,
   sheet,
   setSheet,
   autoBuild,
 }: {
+  sovCategory: string;
+  setSovCategory: (value: string) => void;
   sheet: string;
   setSheet: (value: string) => void;
   autoBuild: number;
@@ -777,18 +739,10 @@ function Reports({
   const [message, setMessage] = useState("");
   const [dragging, setDragging] = useState(false);
   const [locationIndex, setLocationIndex] = useState(0);
-  const [quadrant, setQuadrant] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
-  const [bidRanking, setBidRanking] = useState("volume");
-  const [trendKeyword, setTrendKeyword] = useState("");
-  const [trendBrand, setTrendBrand] = useState("");
-  const [page, setPage] = useState(0);
   const [aiRead, setAiRead] = useState<StrategicRead | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
-  const keywordSearchRef = useRef<HTMLInputElement>(null);
   const autoFlow = useRef(false);
   const aiAutoFor = useRef<Report | null>(null);
   const classificationInput = useRef<{
@@ -800,73 +754,15 @@ function Reports({
   );
   const [classifying, setClassifying] = useState(false);
   const [classificationError, setClassificationError] = useState("");
-  const keywordTrendRef = useRef<HTMLSpanElement>(null);
   const location = report?.locations[locationIndex];
-  const classification = useMemo(
-    () => (location ? reportClassification(location) : []),
-    [location],
-  );
   const websiteBatch = useMemo(() => {
-    if (!report?.websiteHosts.length) return [];
+    if (!report || (!report.websiteHosts.length && !sovCategory)) return [];
     return [
       ...new Set(report.locations.flatMap((item) => [...item.keywords.keys()])),
     ]
       .filter((keyword) => !websiteLabels.has(keyword) && keyword.length <= 160)
       .slice(0, 100);
-  }, [report, websiteLabels]);
-  const opportunities = useMemo(
-    () => (location ? reportOpportunities(location) : []),
-    [location],
-  );
-  const trendMovers = useMemo(
-    () => (location ? reportTrendMovers(location) : []),
-    [location],
-  );
-  const brandRows = useMemo(
-    () => (location ? reportBrandRows(location) : []),
-    [location],
-  );
-  const selectedBrand = trendBrand || brandRows[0]?.brand;
-  const brandTrend = selectedBrand
-    ? location?.brandTrends.get(selectedBrand)
-    : undefined;
-  const brandPeak = reportPeak(brandTrend);
-  const keywordTrend =
-    location?.keywords.get(trendKeyword) ?? opportunities[0]?.row;
-  const visibleQuadrants = location?.quadrants.at(-1)
-    ? reportQuadrants
-    : reportQuadrants.slice(0, -1);
-  const matching = useMemo(
-    () =>
-      location
-        ? [...location.keywords.entries()]
-            .filter(
-              ([key, row]) =>
-                key.includes(reportNormalize(search)) &&
-                (!category ||
-                  reportKeywordCategories(row).includes(category)) &&
-                (quadrant === null || row.quadrant === quadrant) &&
-                (bidRanking === "volume" ||
-                  (row.highBidInr !== null &&
-                    row.highBidInr > 0 &&
-                    (bidRanking !== "low-volume-bid" || row.volume < 1000))),
-            )
-            .map(([, row]) => row)
-            .sort(
-              (a, b) =>
-                (bidRanking === "volume"
-                  ? 0
-                  : (b.highBidInr ?? 0) - (a.highBidInr ?? 0)) ||
-                b.volume - a.volume ||
-                a.keyword.localeCompare(b.keyword),
-            )
-        : [],
-    [location, search, quadrant, bidRanking, category],
-  );
-  function showKeywordTrend(keyword: string) {
-    setTrendKeyword(reportNormalize(keyword));
-    requestAnimationFrame(() => keywordTrendRef.current?.focus());
-  }
+  }, [report, websiteLabels, sovCategory]);
   function applySources(
     sources: { name: string; text?: string; error?: string }[],
     brandList = brands,
@@ -881,13 +777,6 @@ function Reports({
       return;
     }
     setLocationIndex(0);
-    setQuadrant(null);
-    setSearch("");
-    setCategory("");
-    setBidRanking("volume");
-    setTrendKeyword("");
-    setTrendBrand("");
-    setPage(0);
     setAiRead(null);
     setAiMessage("");
     classificationInput.current = { sources, brands: brandList };
@@ -906,6 +795,7 @@ function Reports({
       const labels = await classifyWebsiteKeywords(
         report.websiteHosts.slice(0, 20),
         websiteBatch,
+        sovCategory,
       );
       if (classificationInput.current !== input) return;
       const combined = new Map([...websiteLabels, ...labels]);
@@ -918,8 +808,6 @@ function Reports({
       aiAutoFor.current = updated;
       setWebsiteLabels(combined);
       setReport(updated);
-      setCategory("");
-      setPage(0);
       return updated;
     } catch (error) {
       setClassificationError(
@@ -1032,35 +920,6 @@ function Reports({
       setBusy(false);
     }
   }
-  const keywordsCsv = () =>
-    downloadCsv("Keyword Details.csv", [
-      [
-        "Keyword",
-        "Search volume",
-        "Competition index",
-        "Low bid (₹)",
-        "High bid (₹)",
-        "Volume tier",
-        "Quadrant",
-        "Brand type",
-        "Brand name",
-        "Intent tags",
-        ...(location?.monthLabels ?? []),
-      ],
-      ...matching.map((row) => [
-        row.keyword,
-        row.volume,
-        row.competition,
-        row.lowBidInr,
-        row.highBidInr,
-        reportTiers[row.tier],
-        reportQuadrants[row.quadrant],
-        row.brand,
-        row.brandName,
-        reportKeywordIntents(row).join(", "),
-        ...row.monthly,
-      ]),
-    ]);
   return (
     <>
       <div className="two-column">
@@ -1234,21 +1093,16 @@ function Reports({
         </Alert>
       )}
       {report && location && (
-        <section className="report-results" aria-labelledby="report-title">
-          <div className="results-header">
-            <div>
-              <Badge variant="secondary">
-                <Check size={12} />
-                Report ready
-              </Badge>
-              <h2 id="report-title" tabIndex={-1} ref={resultsRef}>
-                Your search landscape
-              </h2>
-              <p>
-                Google rounds search volumes, so compare levels rather than
-                exact numbers.
-              </p>
-            </div>
+        <ReportDashboard
+          report={report}
+          locationIndex={locationIndex}
+          onLocation={setLocationIndex}
+          headingRef={resultsRef}
+          aiRead={aiRead}
+          aiBusy={aiBusy || classifying}
+          aiMessage={aiMessage}
+          onWriteAi={() => void writeStrategicRead()}
+          actions={
             <div className="sheet-report-actions">
               <DownloadButton
                 onClick={() =>
@@ -1256,6 +1110,16 @@ function Reports({
                 }
               >
                 Summary CSV
+              </DownloadButton>
+              <DownloadButton
+                onClick={() =>
+                  downloadCsv(
+                    "Keyword Details.csv",
+                    keywordRows(report, [location]),
+                  )
+                }
+              >
+                Market keyword CSV
               </DownloadButton>
               <DownloadButton
                 onClick={() =>
@@ -1268,836 +1132,59 @@ function Reports({
                 Export for Claude Code
               </DownloadButton>
             </div>
-          </div>
-          <div className="metric-grid">
-            <Card>
-              <CardContent>
-                <span>Locations compared</span>
-                <strong>{report.locations.length}</strong>
-                <small>Location tabs read from your data</small>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <span>Keywords with demand</span>
-                <strong>{format(report.unique)}</strong>
-                <small>
-                  Different keywords, counted once across all locations
-                </small>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <span>Starting keywords found</span>
-                <strong>
-                  {report.seedCount
-                    ? format(reportPercent(report.seedHits, report.seedCount)) +
-                      "%"
-                    : "—"}
-                </strong>
-                <small>
-                  {report.seedCount
-                    ? `${report.seedHits} of ${report.seedCount} of your starting keywords have search data`
-                    : "Add the Keyword input tab to measure this"}
-                </small>
-              </CardContent>
-            </Card>
-          </div>
-          <Card>
-            <CardHeader>
-              <div className="card-heading">
-                <div>
-                  <CardTitle>Keyword classification</CardTitle>
-                  <CardDescription>
-                    {format(location.keywords.size)} distinct keywords with
-                    demand. Intent tags can overlap.
-                  </CardDescription>
-                </div>
-                <div className="field">
-                  <Label htmlFor="report-location">Location</Label>
-                  <NativeSelect
-                    id="report-location"
-                    value={locationIndex}
-                    onChange={(event) => {
-                      setLocationIndex(Number(event.target.value));
-                      setQuadrant(null);
-                      setSearch("");
-                      setCategory("");
-                      setPage(0);
-                      setTrendKeyword("");
-                      setTrendBrand("");
-                    }}
-                  >
-                    {report.locations.map((item, i) => (
-                      <NativeSelectOption key={item.name} value={i}>
-                        {item.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <DataTable
-                label="Keyword classification"
-                headers={[
-                  "Group",
-                  "Category",
-                  "What it means",
-                  { label: "Keywords", numeric: true },
-                  { label: "Share of keywords", numeric: true },
-                ]}
-                rows={classification.map(
-                  ({ group, label, count, share, value }) => [
-                    group,
-                    count ? (
-                      <button
-                        type="button"
-                        className="keyword-trend-link"
-                        onClick={() => {
-                          setCategory(value);
-                          setSearch("");
-                          setQuadrant(null);
-                          setBidRanking("volume");
-                          setPage(0);
-                          keywordSearchRef.current?.focus();
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ) : (
-                      label
-                    ),
-                    intentMeaning[label] ?? "Label from your Sheet",
-                    format(count),
-                    formatPercent(share),
-                  ],
-                )}
+          }
+          classifyArea={
+            <div className="csv-alternative">
+              <SovCategory
+                id="report-sov-category"
+                value={sovCategory}
+                disabled={busy || classifying || aiBusy}
+                onChange={(value) => {
+                  setSovCategory(value);
+                  setWebsiteLabels(new Map());
+                  setClassificationError("");
+                  setAiRead(null);
+                  if (!classificationInput.current || !websiteLabels.size)
+                    return;
+                  const { sources, brands } = classificationInput.current;
+                  const updated = reportBuild(sources, brands);
+                  aiAutoFor.current = updated;
+                  setReport(updated);
+                }}
               />
-              {classification.some(
-                ({ label, count }) =>
-                  label === "Brand unclassified" && count > 0,
-              ) && (
-                <p className="helper">
-                  Add a brand list or Brand and Intent labels in Keyword input
-                  to classify more keywords.
+              <p className="helper">
+                Select a category to give AI the TBMSOV brand list.
+                Classification uses your keywords and any source domains. OpenAI
+                usage may incur charges.
+              </p>
+              {websiteLabels.size > 0 && (
+                <p className="helper" aria-live="polite">
+                  AI checked {format(websiteLabels.size)} of{" "}
+                  {format(report.unique)} distinct keywords. Review the
+                  suggested labels in the explorer.
                 </p>
               )}
-              {report.websiteHosts.length > 0 && (
-                <div className="csv-alternative">
-                  <p className="helper">
-                    Use AI to suggest brand and intent labels from the website
-                    domains and keywords. This sends those details to OpenAI and
-                    may incur API charges.
-                  </p>
-                  {websiteLabels.size > 0 && (
-                    <p className="helper" aria-live="polite">
-                      AI checked {format(websiteLabels.size)} of{" "}
-                      {format(report.unique)} distinct keywords. Review the
-                      suggested labels in the explorer.
-                    </p>
-                  )}
-                  {websiteBatch.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={classifyWebsiteBatch}
-                      disabled={classifying || aiBusy}
-                    >
-                      <Sparkles />
-                      {classifying
-                        ? "Classifying…"
-                        : `Classify ${websiteBatch.length} website keywords with AI`}
-                    </Button>
-                  )}
-                  {classificationError && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{classificationError}</AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Demand by location</CardTitle>
-              <CardDescription>
-                {report.locations.filter((item) => item.keywords.size <= 1)
-                  .length
-                  ? "Almost no data (one keyword or none) in " +
-                    report.locations
-                      .filter((item) => item.keywords.size <= 1)
-                      .map((item) => item.name)
-                      .join(", ") +
-                    "."
-                  : "Compare coverage and the highest reported volume in each location."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable
-                label="Demand by location"
-                headers={[
-                  "Location",
-                  {
-                    label: "Keywords with demand",
-                    hint: "Searched monthly",
-                    numeric: true,
-                  },
-                  {
-                    label: "Volume levels",
-                    hint: "Distinct values",
-                    numeric: true,
-                  },
-                  {
-                    label: "Top monthly searches",
-                    hint: "Highest here",
-                    numeric: true,
-                  },
-                  {
-                    label: "Starting keywords",
-                    hint: "Found with data",
-                    numeric: true,
-                  },
-                ]}
-                rows={report.locations.map((item) => [
-                  <span className="location-name">
-                    <MapPin size={14} />
-                    {item.name}
-                  </span>,
-                  format(item.keywords.size),
-                  format(item.buckets),
-                  format(item.maxVolume),
-                  report.seedCount ? format(item.seedHits) : "—",
-                ])}
-              />
-              <details className="csv-alternative">
-                <summary>Compare reported volume by region</summary>
-                <p className="helper">
-                  Shares use Google's rounded volumes. Intent groups can
-                  overlap. City and state ratios use only keywords with demand
-                  in both locations.
-                </p>
-                <DataTable
-                  label="Regional volume shares"
-                  headers={[
-                    "Location",
-                    { label: "Branded", hint: "% of searches", numeric: true },
-                    ...reportIntents.map(([name]) => ({
-                      label: name,
-                      hint: "% of searches",
-                      numeric: true,
-                    })),
-                    {
-                      label: "City's share of its state",
-                      hint: "Cities only",
-                      numeric: true,
-                    },
-                  ]}
-                  rows={report.locations.map((item) => {
-                    const shares = reportVolumeShares(item);
-                    return [
-                      item.name,
-                      report.hasBrandLabels
-                        ? formatPercent(shares.branded)
-                        : "—",
-                      ...shares.intents.map(formatPercent),
-                      item.cityState
-                        ? `${formatPercent(item.cityState.volumeShare)} of ${item.cityState.name}`
-                        : "—",
-                    ];
-                  })}
-                />
-              </details>
-            </CardContent>
-          </Card>
-          {Object.keys(report.sheetIntents ?? {}).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Labels in Keyword input</CardTitle>
-                <CardDescription>
-                  Counts use the labelled rows in the Keyword input tab.
-                  {report.sheetBrandCount > 0 &&
-                    ` ${report.sheetBrandCount} brand names from your Sheet are used for the brand tables and the AI summary.`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DataTable
-                  label="Keyword intent"
-                  headers={[
-                    "Intent",
-                    "What it means",
-                    { label: "Keywords", numeric: true },
-                    { label: "Share", numeric: true },
-                  ]}
-                  rows={Object.entries(
-                    report.sheetIntents as Record<string, number>,
-                  ).map(([intent, count]) => {
-                    const total = Object.values(
-                      report.sheetIntents as Record<string, number>,
-                    ).reduce((sum, value) => sum + value, 0);
-                    return [
-                      intent,
-                      intentMeaning[intent] ?? "",
-                      format(count),
-                      `${format(reportPercent(count, total))}%`,
-                    ];
-                  })}
-                />
-              </CardContent>
-            </Card>
-          )}
-          <Card>
-            <CardHeader>
-              <div className="card-heading">
-                <div>
-                  <CardTitle>Find an opportunity</CardTitle>
-                  <CardDescription>
-                    {location.name} · Select a group in the matrix to filter the
-                    keywords below.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="reference-read">
-                <h3>What the numbers show</h3>
-                <p>
-                  In {location.name}, {format(location.keywords.size)} keywords
-                  have reported demand across {format(location.buckets)}{" "}
-                  different volume levels. The highest monthly searches are{" "}
-                  {format(location.maxVolume)}. Google rounds these estimates.
-                </p>
-                <p>
-                  {report.hasBrandLabels
-                    ? `${format(reportPercent(location.branded, location.keywords.size))}% of keywords are labelled as branded or competitor brands. `
-                    : "Add brand names when building the report to measure branded keyword share. "}
-                  Share of keywords by intent:{" "}
-                  {reportIntents
-                    .map(
-                      ([name], index) =>
-                        `${name}: ${format(reportPercent(location.intentCounts[index], location.keywords.size))}%`,
-                    )
-                    .join(" · ")}
-                  . These shares count keywords, not searches.
-                </p>
-                <p>
-                  {format(location.quadrants[1])} keywords have many searches
-                  but few advertisers. Select "Cheap content wins" in the matrix
-                  to see them. Competition measures advertisers, not search
-                  ranking, and bids are estimates.
-                </p>
-              </div>
-              {opportunities.length > 0 && (
-                <div className="brand-breakdown">
-                  <h3>Keywords to investigate in {location.name}</h3>
-                  <DataTable
-                    label="Keyword opportunities"
-                    headers={[
-                      "Why it stands out",
-                      "Keyword",
-                      { label: "Monthly searches", numeric: true },
-                      {
-                        label: "Competition",
-                        hint: "Advertisers, 0 to 100",
-                        numeric: true,
-                      },
-                      {
-                        label: "High bid (₹)",
-                        hint: "Per click",
-                        numeric: true,
-                      },
-                    ]}
-                    rows={opportunities.map(({ label, row }) => [
-                      label,
-                      <button
-                        type="button"
-                        className="keyword-trend-link"
-                        onClick={() => showKeywordTrend(row.keyword)}
-                      >
-                        {row.keyword}
-                      </button>,
-                      format(row.volume),
-                      format(row.competition),
-                      formatBid(row.highBidInr),
-                    ])}
-                  />
-                </div>
-              )}
-              {report.hasBrandLabels && (
-                <div className="brand-breakdown">
-                  <h3>Brands in {location.name}</h3>
-                  {brandRows.length ? (
-                    <DataTable
-                      label="Brands in this location"
-                      headers={[
-                        "Brand",
-                        { label: "Keywords", numeric: true },
-                        {
-                          label: "Monthly searches (approx.)",
-                          hint: "Rounded, added up",
-                          numeric: true,
-                        },
-                        {
-                          label: "Share of branded searches",
-                          numeric: true,
-                        },
-                      ]}
-                      rows={brandRows
-                        .slice(0, 15)
-                        .map((row) => [
-                          <span className="capitalize">{row.brand}</span>,
-                          format(row.keywords),
-                          format(row.volume),
-                          `${format(row.share)}%`,
-                        ])}
-                    />
-                  ) : (
-                    <p className="helper">
-                      No named brands were found in this location.
-                    </p>
-                  )}
-                  <p className="helper">
-                    Volumes add up Google’s rounded values for each brand’s
-                    keywords, so treat them as a guide, not an exact figure.
-                    {report.absentBrands.length > 0 &&
-                      " Not found in any location: " +
-                        report.absentBrands.join(", ") +
-                        "."}
-                  </p>
-                  {brandTrend?.length ? (
-                    <details className="csv-alternative">
-                      <summary>Monthly brand trends</summary>
-                      <div className="field">
-                        <Label htmlFor="trend-brand">Brand</Label>
-                        <NativeSelect
-                          id="trend-brand"
-                          value={selectedBrand}
-                          onChange={(event) =>
-                            setTrendBrand(event.target.value)
-                          }
-                        >
-                          {brandRows.map(({ brand }) => (
-                            <NativeSelectOption key={brand} value={brand}>
-                              {brand}
-                            </NativeSelectOption>
-                          ))}
-                        </NativeSelect>
-                      </div>
-                      <p className="helper">
-                        {location.baselineLabel} = 100.{" "}
-                        {brandPeak &&
-                          `Peak in ${brandPeak.label} at ${format(brandPeak.index)}.`}
-                      </p>
-                      <DataTable
-                        label="Monthly brand trends"
-                        headers={[
-                          "Month",
-                          {
-                            label: "Search level",
-                            hint: `${location.baselineLabel} = 100`,
-                            numeric: true,
-                          },
-                          { label: "Keywords compared", numeric: true },
-                        ]}
-                        rows={brandTrend.map((month) => [
-                          month.label,
-                          format(month.index),
-                          month.pairs,
-                        ])}
-                      />
-                    </details>
-                  ) : null}
-                </div>
-              )}
-              <div className="ai-read">
-                <h3>Strategic read (AI)</h3>
-                <p className="helper">
-                  Runs automatically after a collection started here finishes.
-                  You can also write it for {location.name} using the report
-                  figures and keyword examples. OpenAI usage may incur charges.
-                </p>
+              {websiteBatch.length > 0 && (
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={aiBusy || classifying}
-                  onClick={() => void writeStrategicRead()}
+                  onClick={classifyWebsiteBatch}
+                  disabled={classifying || aiBusy}
                 >
-                  {aiBusy
-                    ? "Writing…"
-                    : aiRead
-                      ? "Write again"
-                      : "Write strategic read"}
+                  <Sparkles />
+                  {classifying
+                    ? "Classifying…"
+                    : `Classify ${websiteBatch.length} keywords with AI`}
                 </Button>
-                {aiMessage && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{aiMessage}</AlertDescription>
-                  </Alert>
-                )}
-                {aiRead && (
-                  <div>
-                    {aiRead.items.map((item, index) => (
-                      <div key={index} className="ai-item">
-                        <strong>{item.section}</strong>
-                        <p>{item.observation}</p>
-                        <p>
-                          <em>Hypothesis (AI):</em> {item.hypothesis}
-                        </p>
-                      </div>
-                    ))}
-                    {aiRead.caveats.length > 0 && (
-                      <ul>
-                        {aiRead.caveats.map((caveat, index) => (
-                          <li key={index}>{caveat}</li>
-                        ))}
-                      </ul>
-                    )}
-                    <p className="helper">
-                      Written by {aiRead.model}. Check every number against the
-                      tables before using it in a client document.
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="opportunity-grid">
-                <div>
-                  <h3>How crowded is each keyword?</h3>
-                  <p className="helper">
-                    Many searches = 1,000 or more a month. Many advertisers =
-                    competition score of 50 or more out of 100. Click a group to
-                    filter the list below.
-                  </p>
-                  <div className="matrix">
-                    {visibleQuadrants.map((name, i) => (
-                      <button
-                        key={name}
-                        type="button"
-                        className={"matrix-item matrix-" + i}
-                        aria-pressed={quadrant === i}
-                        onClick={() => {
-                          setQuadrant(quadrant === i ? null : i);
-                          setPage(0);
-                        }}
-                      >
-                        <span className="matrix-count">
-                          {format(location.quadrants[i])}
-                        </span>
-                        <strong>{name}</strong>
-                        <small>
-                          {
-                            [
-                              "Many searches, many advertisers. Expect high costs.",
-                              "Many searches, few advertisers. Content can win cheaply.",
-                              "Few searches, many advertisers. Someone is betting early.",
-                              "Few searches, few advertisers. Questions nobody answers yet.",
-                              "No competition score for these keywords.",
-                            ][i]
-                          }
-                        </small>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h3>Keywords by monthly searches</h3>
-                  <p className="helper">
-                    How many keywords fall in each search-volume range
-                  </p>
-                  <div className="tiers">
-                    {reportTiers.map((tier, i) => (
-                      <div className="tier" key={tier}>
-                        <span>{tier}</span>
-                        <div aria-hidden="true">
-                          <div
-                            style={{
-                              width:
-                                (100 * location.tiers[i]) /
-                                  Math.max(1, ...location.tiers) +
-                                "%",
-                            }}
-                          />
-                        </div>
-                        <strong>{format(location.tiers[i])}</strong>
-                      </div>
-                    ))}
-                  </div>
-                  {location.cityState && (
-                    <p className="comparison-note">
-                      {location.cityState.pairs
-                        ? `For keywords found in both, this city's searches are a median ${format(location.cityState.index)}% of ${location.cityState.name}'s (${location.cityState.pairs} keywords compared).`
-                        : `No shared positive-volume keywords with ${location.cityState.name}.`}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <div className="card-heading">
-                <div>
-                  <CardTitle>Explore the keywords</CardTitle>
-                  <CardDescription>
-                    Uses labels from your Sheet where available and matches
-                    keyword phrases for other rows.
-                  </CardDescription>
-                </div>
-                <DownloadButton
-                  disabled={!matching.length}
-                  onClick={keywordsCsv}
-                >
-                  Keyword CSV
-                </DownloadButton>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="search-row">
-                <div className="search-field">
-                  <Search />
-                  <Input
-                    ref={keywordSearchRef}
-                    aria-label="Find a keyword"
-                    value={search}
-                    onChange={(event) => {
-                      setSearch(event.target.value);
-                      setPage(0);
-                    }}
-                    placeholder="Find a keyword in this location"
-                  />
-                </div>
-                <NativeSelect
-                  aria-label="Filter keyword classification"
-                  value={category}
-                  onChange={(event) => {
-                    setCategory(event.target.value);
-                    setPage(0);
-                  }}
-                >
-                  <NativeSelectOption value="">
-                    All classifications
-                  </NativeSelectOption>
-                  {classification
-                    .filter(({ count }) => count > 0)
-                    .map(({ value, label, group }) => (
-                      <NativeSelectOption key={value} value={value}>
-                        {group} · {label}
-                      </NativeSelectOption>
-                    ))}
-                </NativeSelect>
-                <NativeSelect
-                  aria-label="Rank keywords"
-                  value={bidRanking}
-                  onChange={(event) => {
-                    setBidRanking(event.target.value);
-                    setPage(0);
-                  }}
-                >
-                  <NativeSelectOption value="volume">
-                    Highest search volume
-                  </NativeSelectOption>
-                  <NativeSelectOption value="bid">
-                    Highest bid
-                  </NativeSelectOption>
-                  <NativeSelectOption value="low-volume-bid">
-                    Highest bid under 1,000 searches
-                  </NativeSelectOption>
-                </NativeSelect>
-                {quadrant !== null && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setQuadrant(null);
-                      setPage(0);
-                    }}
-                  >
-                    {reportQuadrants[quadrant]}
-                    <X />
-                  </Button>
-                )}
-              </div>
-              {matching.length ? (
-                <DataTable
-                  label="Keyword explorer"
-                  headers={[
-                    "Keyword",
-                    { label: "Monthly searches", numeric: true },
-                    {
-                      label: "Competition",
-                      hint: "Advertisers, 0 to 100",
-                      numeric: true,
-                    },
-                    { label: "Low bid (₹)", hint: "Per click", numeric: true },
-                    { label: "High bid (₹)", hint: "Per click", numeric: true },
-                    "Volume level",
-                    "Brand",
-                    "Search intent",
-                  ]}
-                  rows={matching
-                    .slice(page * 50, (page + 1) * 50)
-                    .map((row) => [
-                      <button
-                        type="button"
-                        className="keyword-trend-link"
-                        onClick={() => showKeywordTrend(row.keyword)}
-                      >
-                        {row.keyword}
-                      </button>,
-                      format(row.volume),
-                      format(row.competition),
-                      formatBid(row.lowBidInr),
-                      formatBid(row.highBidInr),
-                      reportTiers[row.tier],
-                      <span>
-                        {row.brand || "Unclassified"}
-                        {row.brandName && ` · ${row.brandName}`}
-                      </span>,
-                      reportKeywordIntents(row).join(", ") || "—",
-                    ])}
-                />
-              ) : (
-                <div className="empty-result">
-                  <Search />
-                  <strong>No matching keywords</strong>
-                  <p>Try another search or change the filters.</p>
-                </div>
               )}
-              <div className="pagination">
-                <span>
-                  {matching.length
-                    ? `${page * 50 + 1}–${Math.min((page + 1) * 50, matching.length)} of ${format(matching.length)} keywords`
-                    : "0 keywords"}
-                </span>
-                <div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    aria-label="Previous page"
-                    disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    <ChevronLeft />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    aria-label="Next page"
-                    disabled={(page + 1) * 50 >= matching.length}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    <ChevronRight />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          {trendMovers.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Biggest changes in search demand</CardTitle>
-                <CardDescription>
-                  {location.name} · {trendMovers[0].firstMonth} to{" "}
-                  {trendMovers[0].lastMonth}. Ranked by change in reported
-                  monthly searches.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DataTable
-                  label="Keyword demand changes"
-                  headers={[
-                    "Keyword",
-                    { label: trendMovers[0].firstMonth, numeric: true },
-                    { label: trendMovers[0].lastMonth, numeric: true },
-                    { label: "Searches gained or lost", numeric: true },
-                    { label: "Change", numeric: true },
-                  ]}
-                  rows={trendMovers.map((row) => [
-                    <button
-                      type="button"
-                      className="keyword-trend-link"
-                      onClick={() => showKeywordTrend(row.keyword)}
-                    >
-                      {row.keyword}
-                    </button>,
-                    format(row.from),
-                    format(row.to),
-                    format(row.change),
-                    formatPercent(row.pct),
-                  ])}
-                />
-              </CardContent>
-            </Card>
-          )}
-          {keywordTrend && (
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <span ref={keywordTrendRef} tabIndex={-1}>
-                    Monthly trend for {keywordTrend.keyword}
-                  </span>
-                </CardTitle>
-                <CardDescription>
-                  {location.name} · Select a keyword to see its monthly search
-                  volume.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {keywordTrend.monthly.some((value) => value !== null) ? (
-                  <DataTable
-                    label="Monthly keyword trend"
-                    headers={[
-                      "Month",
-                      { label: "Monthly searches", numeric: true },
-                    ]}
-                    rows={location.monthLabels.map((month, index) => [
-                      month,
-                      format(keywordTrend.monthly[index]),
-                    ])}
-                  />
-                ) : (
-                  <p className="helper">
-                    This keyword has no monthly data in the Sheet.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-          <Card>
-            <CardHeader>
-              <CardTitle>Seasonality</CardTitle>
-              <CardDescription>
-                {location.seasonNote ||
-                  `Median per-keyword ratio, with ${location.baselineLabel} set to 100.`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {location.seasonality.some((month) => month.pairs) ? (
-                <DataTable
-                  label="Seasonality"
-                  headers={[
-                    "Month",
-                    {
-                      label: "Search level",
-                      hint: `${location.baselineLabel} = 100`,
-                      numeric: true,
-                    },
-                    { label: "Keywords compared", numeric: true },
-                  ]}
-                  rows={location.seasonality.map((month) => [
-                    month.label,
-                    format(month.index),
-                    month.pairs,
-                  ])}
-                />
-              ) : (
-                <p className="helper">
-                  Use dated month headers, such as December 2025, to compare
-                  seasonal demand.
-                </p>
+              {classificationError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{classificationError}</AlertDescription>
+                </Alert>
               )}
-            </CardContent>
-          </Card>
-        </section>
+            </div>
+          }
+        />
       )}
     </>
   );
@@ -2105,6 +1192,7 @@ function Reports({
 
 export default function App() {
   const [sheet, setSheet] = useState("");
+  const [sovCategory, setSovCategory] = useState("");
   const [autoBuild, setAutoBuild] = useState(0);
   const [workspace, setWorkspace] = useState<"collection" | "report">(
     "collection",
@@ -2203,6 +1291,8 @@ export default function App() {
           </header>
           <div hidden={workspace !== "collection"}>
             <Collection
+              sovCategory={sovCategory}
+              setSovCategory={setSovCategory}
               sheet={sheet}
               setSheet={setSheet}
               openReport={() => setWorkspace("report")}
@@ -2216,7 +1306,13 @@ export default function App() {
             />
           </div>
           <div hidden={workspace !== "report"}>
-            <Reports sheet={sheet} setSheet={setSheet} autoBuild={autoBuild} />
+            <Reports
+              sheet={sheet}
+              setSheet={setSheet}
+              autoBuild={autoBuild}
+              sovCategory={sovCategory}
+              setSovCategory={setSovCategory}
+            />
           </div>
           <footer>
             <span>The Bored Monkey · Keyword Workbench</span>

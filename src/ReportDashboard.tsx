@@ -6,6 +6,7 @@ import {
   reportKeywordIntents,
   reportNumber,
   reportPercent,
+  reportTrendMovers,
 } from "../keyword-report";
 import type { StrategicRead } from "./analysis-workflow";
 import "./dashboard.css";
@@ -25,7 +26,7 @@ interface Row {
   brand: string;
   brandName: string;
   intents: number[];
-  sheetIntent?: string;
+  sheetIntent: string;
 }
 
 const CITY_PARENTS = new Set([
@@ -81,11 +82,7 @@ const shortMonth = (label: string) => {
 };
 
 function intentOf(row: Row): string {
-  const intents = reportKeywordIntents(row) as string[];
-  if (intents.length) return intents[0];
-  if (row.brand === "Branded" || row.brand === "Competitor brand")
-    return row.brand;
-  return "Generic";
+  return reportKeywordIntents(row).join(", ") || "No intent tag";
 }
 
 function signalOf(row: Row, bidCut: number): string {
@@ -315,6 +312,7 @@ export default function ReportDashboard({
   headingRef: RefObject<HTMLHeadingElement | null>;
 }) {
   const loc: Loc = report.locations[locationIndex];
+  const movers = useMemo(() => reportTrendMovers(loc), [loc]);
   const rows = useMemo(
     () => [...loc.keywords.values()] as unknown as Row[],
     [loc],
@@ -337,7 +335,7 @@ export default function ReportDashboard({
       }[],
     [loc],
   );
-  const hasBrands = report.brands.length > 0 || report.websiteHosts.length > 0;
+  const hasBrands = report.hasBrandLabels;
   const classification = useMemo(
     () =>
       reportClassification(loc) as {
@@ -359,12 +357,18 @@ export default function ReportDashboard({
 
   const intentCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const row of rows)
-      counts.set(intentOf(row), (counts.get(intentOf(row)) ?? 0) + 1);
+    for (const row of rows) {
+      const intents = reportKeywordIntents(row);
+      for (const intent of intents.length ? intents : ["No intent tag"])
+        counts.set(intent, (counts.get(intent) ?? 0) + 1);
+    }
     return counts;
   }, [rows]);
-  const priceCount =
-    (intentCounts.get("Price / Buy") ?? 0) + (intentCounts.get("Price") ?? 0);
+  const priceCount = rows.filter((row) =>
+    reportKeywordIntents(row).some(
+      (intent) => intent === "Price" || intent === "Price / Buy",
+    ),
+  ).length;
 
   const seasonal = loc.seasonality.filter(
     (m: { index: number | null }) => m.index !== null,
@@ -448,15 +452,15 @@ export default function ReportDashboard({
       <>
         <b className="hl">{fmt(open.length)}</b> keywords have real volume and a
         competition index under 50. The largest is{" "}
-        <b className="hl">{open[0].keyword}</b> at {fmt(open[0].volume)}.
-        Content wins these; paid media is not fighting for them.
+        <b className="hl">{open[0].keyword}</b> at {fmt(open[0].volume)}. These
+        are candidates to test in content or paid search.
       </>,
     );
   } else {
     lines.push(
       <>
-        No keyword pairs volume above 1,000 with a competition index under 50.
-        Every term with scale is already being bid on.
+        No keyword with a recorded competition score pairs at least 1,000
+        searches with a score under 50.
       </>,
     );
   }
@@ -472,6 +476,7 @@ export default function ReportDashboard({
 
   const [q, setQ] = useState("");
   const [intentFilter, setIntentFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({
     key: "volume",
     dir: -1,
@@ -484,7 +489,11 @@ export default function ReportDashboard({
     const list = rows.filter(
       (r) =>
         (!needle || r.keyword.toLowerCase().includes(needle)) &&
-        (!intentFilter || intentOf(r) === intentFilter),
+        (!intentFilter ||
+          reportKeywordIntents(r).includes(intentFilter) ||
+          (intentFilter === "No intent tag" &&
+            !reportKeywordIntents(r).length)) &&
+        (!brandFilter || (r.brand || "Brand unclassified") === brandFilter),
     );
     const get = (r: Row): number | string => {
       switch (sort.key) {
@@ -513,7 +522,7 @@ export default function ReportDashboard({
           : (x as number) - (y as number);
       return c * sort.dir || b.volume - a.volume;
     });
-  }, [rows, q, intentFilter, sort]);
+  }, [rows, q, intentFilter, brandFilter, sort]);
   const pages = Math.max(1, Math.ceil(table.length / 50));
   const th = (key: string, label: string, numeric = false) => (
     <th
@@ -559,10 +568,9 @@ export default function ReportDashboard({
         (a.cityState!.volumeShare as number),
     );
   const intentList = [...intentCounts.entries()]
-    .filter(([name]) => name !== "Generic" && name !== "Branded")
+    .filter(([name]) => name !== "No intent tag")
     .sort((a, b) => b[1] - a[1]);
-  const intentTotal = intentList.reduce((sum, [, n]) => sum + n, 0);
-  const noIntent = total - intentTotal;
+  const noIntent = intentCounts.get("No intent tag") ?? 0;
 
   return (
     <section className="dash" aria-labelledby="report-title">
@@ -586,6 +594,8 @@ export default function ReportDashboard({
                 onLocation(Number(e.target.value));
                 setPage(0);
                 setOpenKeyword("");
+                setIntentFilter("");
+                setBrandFilter("");
               }}
             >
               {groups.national.map(({ l, i }) => (
@@ -785,16 +795,15 @@ export default function ReportDashboard({
             </span>
           </div>
           <p className="pdesc">
-            Bare category and brand names are set aside, because they say
-            nothing about what the person wants. These are the searches that do,
-            as a share of each other.
+            Shares use all keywords in this market. A keyword can match multiple
+            intents.
           </p>
           {intentList.length ? (
             <Bars
               items={intentList.map(([name, n]) => ({
                 label: name,
                 value: n,
-                display: fmt(share(n, intentTotal)) + "%",
+                display: fmt(share(n, total)) + "%",
               }))}
             />
           ) : (
@@ -934,6 +943,24 @@ export default function ReportDashboard({
               ))}
             </select>
           </div>
+          <div className="field">
+            <label htmlFor="dash-brand">Brand type</label>
+            <select
+              id="dash-brand"
+              value={brandFilter}
+              onChange={(event) => {
+                setBrandFilter(event.target.value);
+                setPage(0);
+              }}
+            >
+              <option value="">All brand types</option>
+              {classification
+                .filter((item) => item.group === "Brand" && item.count > 0)
+                .map((item) => (
+                  <option key={item.label}>{item.label}</option>
+                ))}
+            </select>
+          </div>
         </div>
         <div className="tablewrap">
           <table>
@@ -974,7 +1001,9 @@ export default function ReportDashboard({
                     <td>{intentOf(r)}</td>
                     <td>
                       {r.brandName ? (
-                        <span className="pill">{r.brandName}</span>
+                        <span className="pill">
+                          {r.brandName} · {r.brand}
+                        </span>
                       ) : (
                         "—"
                       )}
@@ -1034,6 +1063,41 @@ export default function ReportDashboard({
         </div>
       </div>
 
+      {movers.length > 0 && (
+        <div className="panel">
+          <div className="phead">
+            <h3>Biggest changes in demand</h3>
+            <span className="meta">
+              {movers[0].firstMonth} to {movers[0].lastMonth}
+            </span>
+          </div>
+          <div className="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Keyword</th>
+                  <th>Earlier searches</th>
+                  <th>Latest searches</th>
+                  <th>Change</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movers.map((row) => (
+                  <tr key={row.keyword}>
+                    <td>{row.keyword}</td>
+                    <td className="num">{fmt(row.from)}</td>
+                    <td className="num">{fmt(row.to)}</td>
+                    <td className="num">
+                      {row.change > 0 ? "+" : ""}
+                      {fmt(row.change)} ({fmt(row.pct)}%)
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <div className="panel notes">
         <div className="phead">
           <h3>Build notes</h3>

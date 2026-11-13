@@ -18,7 +18,8 @@ export const websiteIntents = [
 ];
 
 export type WebsiteKeywordLabel = {
-  brandType: "Own brand" | "Competitor brand" | "Generic" | "Unclassified";
+  brandType:
+    "Own brand" | "Branded" | "Competitor brand" | "Generic" | "Unclassified";
   brandName: string;
   intent: string;
 };
@@ -26,6 +27,7 @@ export type WebsiteKeywordLabel = {
 export async function classifyWebsiteKeywords(
   hosts: string[],
   keywords: string[],
+  sovCategory = "",
 ) {
   const endpoint =
     import.meta.env.VITE_ANALYSIS_WEBHOOK_URL?.trim() || ANALYSIS_WEBHOOK_URL;
@@ -34,7 +36,12 @@ export async function classifyWebsiteKeywords(
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "classify_website", hosts, keywords }),
+    body: JSON.stringify({
+      mode: "classify_website",
+      hosts,
+      keywords,
+      ...(sovCategory && { sovCategory }),
+    }),
     signal: AbortSignal.timeout(180_000),
   });
   if (!response.ok)
@@ -58,13 +65,16 @@ export async function classifyWebsiteKeywords(
       continue;
     if (
       row.brandType !== "Own brand" &&
+      row.brandType !== "Branded" &&
       row.brandType !== "Competitor brand" &&
       row.brandType !== "Generic" &&
       row.brandType !== "Unclassified"
     )
       continue;
     const named =
-      row.brandType === "Own brand" || row.brandType === "Competitor brand";
+      row.brandType === "Own brand" ||
+      row.brandType === "Branded" ||
+      row.brandType === "Competitor brand";
     const brandName =
       named && typeof row.brandName === "string"
         ? row.brandName.trim().slice(0, 100)
