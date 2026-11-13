@@ -70,17 +70,23 @@ import {
 } from "@/components/watermelon/native-select";
 import { WEBHOOKS, SHEETS, LOCATIONS, MONTHS } from "./config";
 import { readGoogleSheet, sheetIdFromInput } from "./google-sheets";
-import { requestStrategicRead } from "./analysis-workflow";
-import type { StrategicRead } from "./analysis-workflow";
+import {
+  classifyWebsiteKeywords,
+  requestStrategicRead,
+} from "./analysis-workflow";
+import type { StrategicRead, WebsiteKeywordLabel } from "./analysis-workflow";
 import { buildClaudeBundle } from "./claude-bundle";
 import { askNotificationPermission, notifyUser } from "./notify";
-import { sheetFillProgress } from "./watch-sheet";
-import type { FillProgress } from "./watch-sheet";
+import { collectionProgress } from "./watch-sheet";
 import {
   reportBuild,
   reportBrandRows,
+  reportClassification,
+  reportKeywordCategories,
+  reportKeywordIntents,
   reportVolumeShares,
   reportOpportunities,
+  reportTrendMovers,
   reportPeak,
   reportFacts,
   reportExportRows,
@@ -190,7 +196,7 @@ function downloadCsv(name: string, rows: unknown[][]) {
 }
 
 const intentMeaning: Record<string, string> = {
-  Branded: "Contains the site's own brand name",
+  Branded: "Contains a brand name",
   "Competitor brand": "Contains another brand's name",
   Generic: "No brand: a plain product or category term",
   "Best / Review": "Looking for the best option or reviews",
@@ -201,6 +207,12 @@ const intentMeaning: Record<string, string> = {
   Ingredient: "An active ingredient",
   Comparison: "Comparing two or more options",
   Local: "Near me or nearby",
+  Price: "Checking prices, deals or how to buy",
+  Doubt: "Checking safety, benefits or other questions",
+  Recipe: "Looking for a recipe",
+  Usage: "Learning how to use a product",
+  "Brand unclassified": "Brand status is unknown",
+  "No intent tag": "No specific intent was matched",
 };
 
 function downloadClaudeBundle(
@@ -299,9 +311,10 @@ function Collection({
   const [confirmed, setConfirmed] = useState(false);
   const [watchTarget, setWatchTarget] = useState<{
     id: string;
-    tabs: string[];
+    runId: string;
   } | null>(null);
-  const [progress, setProgress] = useState<FillProgress | null>(null);
+  const [progress, setProgress] =
+    useState<Awaited<ReturnType<typeof collectionProgress>>>(null);
   const [watchNote, setWatchNote] = useState("");
   const [mode, setMode] = useState<Mode>("website");
   const [brandsText, setBrandsText] = useState("");
@@ -328,20 +341,17 @@ function Collection({
     if (!watchTarget) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
-    let lastRows = -1;
-    let stable = 0;
     const startedAt = Date.now();
     async function check() {
       try {
-        const latest = await sheetFillProgress(
+        const latest = await collectionProgress(
           watchTarget!.id,
-          watchTarget!.tabs,
+          watchTarget!.runId,
         );
         if (cancelled) return;
         setProgress(latest);
-        stable = latest.rows > 0 && latest.rows === lastRows ? stable + 1 : 0;
-        lastRows = latest.rows;
-        if (stable >= 4) {
+        if (latest && latest.finished === latest.total) {
+          setConfirmed(true);
           setWatchTarget(null);
           setWatchNote("Collection finished. Opening your report.");
           onFilled(watchTarget!.id);
@@ -384,7 +394,7 @@ function Collection({
         dates.endYear * 12 + MONTHS.indexOf(dates.endMonth)
     )
       problem = "The start month must come before the end month.";
-    if (problem) {
+    if (problem || !id) {
       setError(problem);
       setState("error");
       return;
@@ -399,12 +409,18 @@ function Collection({
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     const range = custom ? dates : defaultDates;
+    const runId = Array.from(
+      crypto.getRandomValues(new Uint8Array(12)),
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join("");
+    setSheetLink("https://docs.google.com/spreadsheets/d/" + id + "/edit");
     try {
       const result = await fetch(WEBHOOKS[mode], {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sheetUrl: id,
+          runId,
           allLocations: all,
           ...(!all ? { locations } : {}),
           ...(mode === "keywords" && brandsText.trim()
@@ -422,23 +438,22 @@ function Collection({
             ". " +
             text.slice(0, 300),
         );
-      try {
-        const body = JSON.parse(text);
-        setConfirmed(body?.status === "success");
-      } catch {
-        setConfirmed(false);
-      }
       setResponse(text);
-      setSheetLink("https://docs.google.com/spreadsheets/d/" + id + "/edit");
       setState("accepted");
-      if (id) setWatchTarget({ id, tabs: all ? [...LOCATIONS] : locations });
+      setWatchTarget({ id, runId });
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        setState("accepted");
+        setWatchTarget({ id, runId });
+        setWatchNote(
+          "The request is taking longer than expected. Waiting for the workflow to confirm completion.",
+        );
+        return;
+      }
       setError(
-        error instanceof Error && error.name === "AbortError"
-          ? "The request timed out. Check your sheet before retrying, as the workflow may still be running."
-          : error instanceof Error
-            ? error.message
-            : "The request failed. Check your connection and try again.",
+        error instanceof Error
+          ? error.message
+          : "The request failed. Check your connection and try again.",
       );
       setState("error");
     } finally {
@@ -677,11 +692,11 @@ function Collection({
                     <p>
                       Watching your sheet:{" "}
                       {progress
-                        ? `${progress.filled} of ${progress.total} locations have data.`
+                        ? `${progress.finished} of ${progress.total} workflow groups finished.`
                         : "checking…"}{" "}
-                      Keep this page open. When the data stops growing, the
-                      keyword report opens, the AI summary is written, and you
-                      get a browser notification.{" "}
+                      Keep this page open. When the workflow confirms
+                      completion, the keyword report opens, the AI summary is
+                      written, and you get a browser notification.{" "}
                       <button
                         type="button"
                         className="keyword-trend-link"
@@ -721,7 +736,10 @@ function Collection({
                 <LockKeyhole />
                 Results go to your sheet
               </span>
-              <Button type="submit" disabled={state === "running"}>
+              <Button
+                type="submit"
+                disabled={state === "running" || Boolean(watchTarget)}
+              >
                 {state === "running" ? (
                   <>
                     <Loader2 className="spinner" />
@@ -761,6 +779,7 @@ function Reports({
   const [locationIndex, setLocationIndex] = useState(0);
   const [quadrant, setQuadrant] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
   const [bidRanking, setBidRanking] = useState("volume");
   const [trendKeyword, setTrendKeyword] = useState("");
   const [trendBrand, setTrendBrand] = useState("");
@@ -769,12 +788,38 @@ function Reports({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const resultsRef = useRef<HTMLHeadingElement>(null);
+  const keywordSearchRef = useRef<HTMLInputElement>(null);
   const autoFlow = useRef(false);
   const aiAutoFor = useRef<Report | null>(null);
+  const classificationInput = useRef<{
+    sources: { name: string; text?: string; error?: string }[];
+    brands: string;
+  } | null>(null);
+  const [websiteLabels, setWebsiteLabels] = useState(
+    new Map<string, WebsiteKeywordLabel>(),
+  );
+  const [classifying, setClassifying] = useState(false);
+  const [classificationError, setClassificationError] = useState("");
   const keywordTrendRef = useRef<HTMLSpanElement>(null);
   const location = report?.locations[locationIndex];
+  const classification = useMemo(
+    () => (location ? reportClassification(location) : []),
+    [location],
+  );
+  const websiteBatch = useMemo(() => {
+    if (!report?.websiteHosts.length) return [];
+    return [
+      ...new Set(report.locations.flatMap((item) => [...item.keywords.keys()])),
+    ]
+      .filter((keyword) => !websiteLabels.has(keyword) && keyword.length <= 160)
+      .slice(0, 100);
+  }, [report, websiteLabels]);
   const opportunities = useMemo(
     () => (location ? reportOpportunities(location) : []),
+    [location],
+  );
+  const trendMovers = useMemo(
+    () => (location ? reportTrendMovers(location) : []),
     [location],
   );
   const brandRows = useMemo(
@@ -798,6 +843,8 @@ function Reports({
             .filter(
               ([key, row]) =>
                 key.includes(reportNormalize(search)) &&
+                (!category ||
+                  reportKeywordCategories(row).includes(category)) &&
                 (quadrant === null || row.quadrant === quadrant) &&
                 (bidRanking === "volume" ||
                   (row.highBidInr !== null &&
@@ -814,7 +861,7 @@ function Reports({
                 a.keyword.localeCompare(b.keyword),
             )
         : [],
-    [location, search, quadrant, bidRanking],
+    [location, search, quadrant, bidRanking, category],
   );
   function showKeywordTrend(keyword: string) {
     setTrendKeyword(reportNormalize(keyword));
@@ -836,23 +883,66 @@ function Reports({
     setLocationIndex(0);
     setQuadrant(null);
     setSearch("");
+    setCategory("");
     setBidRanking("volume");
     setTrendKeyword("");
     setTrendBrand("");
     setPage(0);
     setAiRead(null);
     setAiMessage("");
+    classificationInput.current = { sources, brands: brandList };
+    setWebsiteLabels(new Map());
+    setClassificationError("");
     setReportSheetId(sourceSheetId);
     setReport(result);
     requestAnimationFrame(() => resultsRef.current?.focus());
   }
-  async function writeStrategicRead() {
-    if (!report) return;
+  async function classifyWebsiteBatch() {
+    const input = classificationInput.current;
+    if (!report || !input || !websiteBatch.length || classifying) return report;
+    setClassifying(true);
+    setClassificationError("");
+    try {
+      const labels = await classifyWebsiteKeywords(
+        report.websiteHosts.slice(0, 20),
+        websiteBatch,
+      );
+      if (classificationInput.current !== input) return;
+      const combined = new Map([...websiteLabels, ...labels]);
+      const updated = reportBuild(
+        input.sources,
+        input.brands,
+        LOCATIONS,
+        combined,
+      );
+      aiAutoFor.current = updated;
+      setWebsiteLabels(combined);
+      setReport(updated);
+      setCategory("");
+      setPage(0);
+      return updated;
+    } catch (error) {
+      setClassificationError(
+        error instanceof Error
+          ? error.message
+          : "Website classification failed.",
+      );
+      return report;
+    } finally {
+      setClassifying(false);
+    }
+  }
+  async function writeStrategicRead(target = report) {
+    if (!target) return;
     setAiBusy(true);
     setAiMessage("");
     let written = false;
     try {
-      setAiRead(await requestStrategicRead(reportFacts(report, location)));
+      setAiRead(
+        await requestStrategicRead(
+          reportFacts(target, target.locations[locationIndex]),
+        ),
+      );
       written = true;
     } catch (error) {
       setAiMessage(
@@ -863,7 +953,7 @@ function Reports({
       if (autoFlow.current || document.hidden) {
         notifyUser(
           "Your keyword report is ready",
-          `${report.locations.length} locations, ${format(report.unique)} keywords. ` +
+          `${target.locations.length} locations, ${format(target.unique)} keywords. ` +
             (written
               ? "The AI summary is written."
               : "The AI summary could not be written."),
@@ -873,9 +963,13 @@ function Reports({
     }
   }
   useEffect(() => {
-    if (!report || aiAutoFor.current === report) return;
+    if (!report || !autoFlow.current || aiAutoFor.current === report) return;
     aiAutoFor.current = report;
-    void writeStrategicRead();
+    if (websiteBatch.length) {
+      void classifyWebsiteBatch().then(writeStrategicRead);
+    } else {
+      void writeStrategicRead(report);
+    }
   }, [report]);
   useEffect(() => {
     if (autoBuild > 0) {
@@ -895,6 +989,7 @@ function Reports({
     try {
       applySources(await readGoogleSheet(id), brands, id);
     } catch (error) {
+      autoFlow.current = false;
       setMessage(
         error instanceof Error ? error.message : "Could not read the sheet.",
       );
@@ -947,7 +1042,8 @@ function Reports({
         "High bid (₹)",
         "Volume tier",
         "Quadrant",
-        "Brand",
+        "Brand type",
+        "Brand name",
         "Intent tags",
         ...(location?.monthLabels ?? []),
       ],
@@ -960,7 +1056,8 @@ function Reports({
         reportTiers[row.tier],
         reportQuadrants[row.quadrant],
         row.brand,
-        row.intents.map((i: number) => reportIntents[i][0]).join(", "),
+        row.brandName,
+        reportKeywordIntents(row).join(", "),
         ...row.monthly,
       ]),
     ]);
@@ -1016,7 +1113,7 @@ function Reports({
                 <Button
                   type="button"
                   onClick={() => buildSheet()}
-                  disabled={busy || aiBusy}
+                  disabled={busy || aiBusy || classifying}
                 >
                   {busy ? <Loader2 className="spinner" /> : <ArrowRight />}
                   {busy ? "Reading Sheet" : "Build report from public Sheet"}
@@ -1105,7 +1202,10 @@ function Reports({
                     <LockKeyhole />
                     Files stay on your device
                   </span>
-                  <Button type="submit" disabled={busy || aiBusy}>
+                  <Button
+                    type="submit"
+                    disabled={busy || aiBusy || classifying}
+                  >
                     {busy ? (
                       <>
                         <Loader2 className="spinner" />
@@ -1205,6 +1305,122 @@ function Reports({
           </div>
           <Card>
             <CardHeader>
+              <div className="card-heading">
+                <div>
+                  <CardTitle>Keyword classification</CardTitle>
+                  <CardDescription>
+                    {format(location.keywords.size)} distinct keywords with
+                    demand. Intent tags can overlap.
+                  </CardDescription>
+                </div>
+                <div className="field">
+                  <Label htmlFor="report-location">Location</Label>
+                  <NativeSelect
+                    id="report-location"
+                    value={locationIndex}
+                    onChange={(event) => {
+                      setLocationIndex(Number(event.target.value));
+                      setQuadrant(null);
+                      setSearch("");
+                      setCategory("");
+                      setPage(0);
+                      setTrendKeyword("");
+                      setTrendBrand("");
+                    }}
+                  >
+                    {report.locations.map((item, i) => (
+                      <NativeSelectOption key={item.name} value={i}>
+                        {item.name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                label="Keyword classification"
+                headers={[
+                  "Group",
+                  "Category",
+                  "What it means",
+                  { label: "Keywords", numeric: true },
+                  { label: "Share of keywords", numeric: true },
+                ]}
+                rows={classification.map(
+                  ({ group, label, count, share, value }) => [
+                    group,
+                    count ? (
+                      <button
+                        type="button"
+                        className="keyword-trend-link"
+                        onClick={() => {
+                          setCategory(value);
+                          setSearch("");
+                          setQuadrant(null);
+                          setBidRanking("volume");
+                          setPage(0);
+                          keywordSearchRef.current?.focus();
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ) : (
+                      label
+                    ),
+                    intentMeaning[label] ?? "Label from your Sheet",
+                    format(count),
+                    formatPercent(share),
+                  ],
+                )}
+              />
+              {classification.some(
+                ({ label, count }) =>
+                  label === "Brand unclassified" && count > 0,
+              ) && (
+                <p className="helper">
+                  Add a brand list or Brand and Intent labels in Keyword input
+                  to classify more keywords.
+                </p>
+              )}
+              {report.websiteHosts.length > 0 && (
+                <div className="csv-alternative">
+                  <p className="helper">
+                    Use AI to suggest brand and intent labels from the website
+                    domains and keywords. This sends those details to OpenAI and
+                    may incur API charges.
+                  </p>
+                  {websiteLabels.size > 0 && (
+                    <p className="helper" aria-live="polite">
+                      AI checked {format(websiteLabels.size)} of{" "}
+                      {format(report.unique)} distinct keywords. Review the
+                      suggested labels in the explorer.
+                    </p>
+                  )}
+                  {websiteBatch.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={classifyWebsiteBatch}
+                      disabled={classifying || aiBusy}
+                    >
+                      <Sparkles />
+                      {classifying
+                        ? "Classifying…"
+                        : `Classify ${websiteBatch.length} website keywords with AI`}
+                    </Button>
+                  )}
+                  {classificationError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{classificationError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
               <CardTitle>Demand by location</CardTitle>
               <CardDescription>
                 {report.locations.filter((item) => item.keywords.size <= 1)
@@ -1282,7 +1498,7 @@ function Reports({
                     const shares = reportVolumeShares(item);
                     return [
                       item.name,
-                      report.brands.length
+                      report.hasBrandLabels
                         ? formatPercent(shares.branded)
                         : "—",
                       ...shares.intents.map(formatPercent),
@@ -1298,10 +1514,9 @@ function Reports({
           {Object.keys(report.sheetIntents ?? {}).length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>What people are looking for</CardTitle>
+                <CardTitle>Labels in Keyword input</CardTitle>
                 <CardDescription>
-                  Every keyword in your Sheet is sorted by intent when it is
-                  collected. Counts are keywords, not searches.
+                  Counts use the labelled rows in the Keyword input tab.
                   {report.sheetBrandCount > 0 &&
                     ` ${report.sheetBrandCount} brand names from your Sheet are used for the brand tables and the AI summary.`}
                 </CardDescription>
@@ -1338,30 +1553,9 @@ function Reports({
                 <div>
                   <CardTitle>Find an opportunity</CardTitle>
                   <CardDescription>
-                    Pick a location, then pick a group in the matrix to filter
-                    the keyword list below.
+                    {location.name} · Select a group in the matrix to filter the
+                    keywords below.
                   </CardDescription>
-                </div>
-                <div className="field">
-                  <Label htmlFor="report-location">Location</Label>
-                  <NativeSelect
-                    id="report-location"
-                    value={locationIndex}
-                    onChange={(event) => {
-                      setLocationIndex(Number(event.target.value));
-                      setQuadrant(null);
-                      setSearch("");
-                      setPage(0);
-                      setTrendKeyword("");
-                      setTrendBrand("");
-                    }}
-                  >
-                    {report.locations.map((item, i) => (
-                      <NativeSelectOption key={item.name} value={i}>
-                        {item.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
                 </div>
               </div>
             </CardHeader>
@@ -1375,8 +1569,8 @@ function Reports({
                   {format(location.maxVolume)}. Google rounds these estimates.
                 </p>
                 <p>
-                  {report.brands.length
-                    ? `${format(reportPercent(location.branded, location.keywords.size))}% of keywords match your brand list. `
+                  {report.hasBrandLabels
+                    ? `${format(reportPercent(location.branded, location.keywords.size))}% of keywords are labelled as branded or competitor brands. `
                     : "Add brand names when building the report to measure branded keyword share. "}
                   Share of keywords by intent:{" "}
                   {reportIntents
@@ -1430,7 +1624,7 @@ function Reports({
                   />
                 </div>
               )}
-              {report.brands.length > 0 && (
+              {report.hasBrandLabels && (
                 <div className="brand-breakdown">
                   <h3>Brands in {location.name}</h3>
                   {brandRows.length ? (
@@ -1460,7 +1654,7 @@ function Reports({
                     />
                   ) : (
                     <p className="helper">
-                      No brand from your list appears in this location.
+                      No named brands were found in this location.
                     </p>
                   )}
                   <p className="helper">
@@ -1519,15 +1713,15 @@ function Reports({
               <div className="ai-read">
                 <h3>Strategic read (AI)</h3>
                 <p className="helper">
-                  Written automatically when the report is ready, from the
-                  summary and keyword examples for {location.name}. It goes to
-                  OpenAI and costs well under a rupee per report.
+                  Runs automatically after a collection started here finishes.
+                  You can also write it for {location.name} using the report
+                  figures and keyword examples. OpenAI usage may incur charges.
                 </p>
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={aiBusy}
-                  onClick={writeStrategicRead}
+                  disabled={aiBusy || classifying}
+                  onClick={() => void writeStrategicRead()}
                 >
                   {aiBusy
                     ? "Writing…"
@@ -1644,8 +1838,8 @@ function Reports({
                 <div>
                   <CardTitle>Explore the keywords</CardTitle>
                   <CardDescription>
-                    Brand and intent tags use your brand list and fixed phrase
-                    rules.
+                    Uses labels from your Sheet where available and matches
+                    keyword phrases for other rows.
                   </CardDescription>
                 </div>
                 <DownloadButton
@@ -1661,6 +1855,7 @@ function Reports({
                 <div className="search-field">
                   <Search />
                   <Input
+                    ref={keywordSearchRef}
                     aria-label="Find a keyword"
                     value={search}
                     onChange={(event) => {
@@ -1670,6 +1865,25 @@ function Reports({
                     placeholder="Find a keyword in this location"
                   />
                 </div>
+                <NativeSelect
+                  aria-label="Filter keyword classification"
+                  value={category}
+                  onChange={(event) => {
+                    setCategory(event.target.value);
+                    setPage(0);
+                  }}
+                >
+                  <NativeSelectOption value="">
+                    All classifications
+                  </NativeSelectOption>
+                  {classification
+                    .filter(({ count }) => count > 0)
+                    .map(({ value, label, group }) => (
+                      <NativeSelectOption key={value} value={value}>
+                        {group} · {label}
+                      </NativeSelectOption>
+                    ))}
+                </NativeSelect>
                 <NativeSelect
                   aria-label="Rank keywords"
                   value={bidRanking}
@@ -1734,21 +1948,18 @@ function Reports({
                       formatBid(row.lowBidInr),
                       formatBid(row.highBidInr),
                       reportTiers[row.tier],
-                      row.brand ? (
-                        <Badge variant="secondary">{row.brand}</Badge>
-                      ) : (
-                        "—"
-                      ),
-                      row.intents
-                        .map((i: number) => reportIntents[i][0])
-                        .join(", ") || "—",
+                      <span>
+                        {row.brand || "Unclassified"}
+                        {row.brandName && ` · ${row.brandName}`}
+                      </span>,
+                      reportKeywordIntents(row).join(", ") || "—",
                     ])}
                 />
               ) : (
                 <div className="empty-result">
                   <Search />
                   <strong>No matching keywords</strong>
-                  <p>Try another search or clear the competition filter.</p>
+                  <p>Try another search or change the filters.</p>
                 </div>
               )}
               <div className="pagination">
@@ -1780,6 +1991,43 @@ function Reports({
               </div>
             </CardContent>
           </Card>
+          {trendMovers.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Biggest changes in search demand</CardTitle>
+                <CardDescription>
+                  {location.name} · {trendMovers[0].firstMonth} to{" "}
+                  {trendMovers[0].lastMonth}. Ranked by change in reported
+                  monthly searches.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DataTable
+                  label="Keyword demand changes"
+                  headers={[
+                    "Keyword",
+                    { label: trendMovers[0].firstMonth, numeric: true },
+                    { label: trendMovers[0].lastMonth, numeric: true },
+                    { label: "Searches gained or lost", numeric: true },
+                    { label: "Change", numeric: true },
+                  ]}
+                  rows={trendMovers.map((row) => [
+                    <button
+                      type="button"
+                      className="keyword-trend-link"
+                      onClick={() => showKeywordTrend(row.keyword)}
+                    >
+                      {row.keyword}
+                    </button>,
+                    format(row.from),
+                    format(row.to),
+                    format(row.change),
+                    formatPercent(row.pct),
+                  ])}
+                />
+              </CardContent>
+            </Card>
+          )}
           {keywordTrend && (
             <Card>
               <CardHeader>

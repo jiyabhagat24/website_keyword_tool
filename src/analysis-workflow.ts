@@ -5,6 +5,83 @@ export interface StrategicRead {
   model: string;
 }
 
+export const websiteIntents = [
+  "Price / Buy",
+  "Best / Review",
+  "Comparison",
+  "Question",
+  "How-to",
+  "Concern",
+  "Ingredient",
+  "Local",
+  "Recipe",
+];
+
+export type WebsiteKeywordLabel = {
+  brandType: "Own brand" | "Competitor brand" | "Generic" | "Unclassified";
+  brandName: string;
+  intent: string;
+};
+
+export async function classifyWebsiteKeywords(
+  hosts: string[],
+  keywords: string[],
+) {
+  const endpoint =
+    import.meta.env.VITE_ANALYSIS_WEBHOOK_URL?.trim() || ANALYSIS_WEBHOOK_URL;
+  if (!endpoint || new URL(endpoint).protocol !== "https:")
+    throw new Error("The AI analysis needs an HTTPS webhook URL.");
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "classify_website", hosts, keywords }),
+    signal: AbortSignal.timeout(180_000),
+  });
+  if (!response.ok)
+    throw new Error(
+      `The AI classifier returned HTTP ${response.status}. Check the analysis workflow in n8n.`,
+    );
+  const result: { labels?: unknown[] } = await response.json();
+  if (!Array.isArray(result?.labels))
+    throw new Error(
+      "The analysis webhook needs the updated website classification workflow.",
+    );
+  const labels = new Map<string, WebsiteKeywordLabel>();
+  for (const raw of result.labels) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Partial<WebsiteKeywordLabel> & { id?: number };
+    if (
+      typeof row.id !== "number" ||
+      !Number.isInteger(row.id) ||
+      !keywords[row.id]
+    )
+      continue;
+    if (
+      row.brandType !== "Own brand" &&
+      row.brandType !== "Competitor brand" &&
+      row.brandType !== "Generic" &&
+      row.brandType !== "Unclassified"
+    )
+      continue;
+    const named =
+      row.brandType === "Own brand" || row.brandType === "Competitor brand";
+    const brandName =
+      named && typeof row.brandName === "string"
+        ? row.brandName.trim().slice(0, 100)
+        : "";
+    labels.set(keywords[row.id], {
+      brandType: named && !brandName ? "Unclassified" : row.brandType,
+      brandName,
+      intent:
+        typeof row.intent === "string" && websiteIntents.includes(row.intent)
+          ? row.intent
+          : "",
+    });
+  }
+  if (!labels.size) throw new Error("The AI returned no valid keyword labels.");
+  return labels;
+}
+
 /** Sends calculated facts and selected keyword examples for AI hypotheses. */
 export async function requestStrategicRead(
   facts: unknown,

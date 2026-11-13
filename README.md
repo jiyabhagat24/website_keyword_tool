@@ -34,7 +34,7 @@ If you configure `VITE_GOOGLE_SHEETS_API_KEY`, the public import uses the Google
 5. Publish the workflow. Set `VITE_ANALYSIS_WEBHOOK_URL` in your hosting service to the production HTTPS webhook URL and rebuild the website. For local development, place that variable in the gitignored `.env.local` file.
 6. In **Keyword report**, choose **Write strategic read** after a report is available. Review suggested brands before using them for decisions.
 
-The workflow reads the standard location and input tabs. Use CSV import for custom location names. The analysis runs after the user starts it and the n8n webhook responds; large sheets and paid brand detection can hit execution, response-size, rate, or proxy timeout limits. Check the n8n execution before retrying after a timeout. The live n8n workflow and its completion behavior must be tested in your instance before relying on automatic handoff.
+For automatic analysis, deploy the matching updated collection workflow JSON files and the analysis workflow. Assign the existing Google Sheets credential to **Create Collection Status** and **Mark Collection Complete** in each collection workflow. The browser watches a run-specific status tab in the link-shared Sheet and starts the strategic read once every workflow group reports completion. A website collection first classifies one batch of up to 100 keywords. Use the report's classification button for further batches. Keep the workbench open until the report is ready. Opening a saved Sheet or importing CSV manually lets you start AI from the report.
 
 ## Build a keyword report from CSV
 
@@ -43,6 +43,10 @@ The workflow reads the standard location and input tabs. Use CSV import for cust
 3. Optionally enter comma-separated brands. Use `Brand | alias | alias` to group spelling variants under one brand. Intent tags use fixed phrases for price, comparison, doubt, recipes, and usage.
 4. Build the report and select a location. Select a keyword to see its monthly trend, or rank the explorer by bid to find expensive terms. Expand the regional comparison to see shares of reported volume and city versus state ratios for matched keywords.
 5. Download the summary or keyword details as CSV. In your original Google Sheet, use **File → Import → Upload** and choose **Insert new sheet(s)**.
+
+The **Keyword classification** section shows distinct keyword counts and shares by brand type and intent for the selected location. Click a category to open the matching keywords. The report uses labels from **Keyword input** and **Keyword Suggestion** when available, then falls back to the brand list and phrase rules. One keyword can match several intent rules. The Summary CSV includes the classification breakdown for each location.
+
+For reports with a **Website Input** tab, **Classify website keywords with AI** sends domain names and up to 100 unprocessed keywords per click to the analysis workflow. It suggests own-brand, competitor, generic, and intent labels in the report and exports. Uncertain brand labels remain unclassified. The analysis workflow must include the `classify_website` mode from the current workflow export. AI calls may incur charges.
 
 The report processes the CSVs in the browser. It uses distinct positive-volume keywords, counts volume tiers, and uses 1,000 search volume and 50 competition index as the quadrant thresholds. Volume shares use Google's rounded figures and can overlap for intent tags. Location and brand trends use the median keyword-level ratio to December 2025, or the earliest dated column when December 2025 is absent. City/state comparisons use keywords found with positive volume in both exported tabs.
 

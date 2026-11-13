@@ -22,7 +22,7 @@ const reportQuadrants = [
 const reportIntents = [
   [
     "Price",
-    /\b(?:price|cost|cheap|budget|discount|affordable|under\s+(?:rs\.?\s*)?\d[\d,.]*k?)\b/i,
+    /\b(?:prices?|cost|cheap|budget|discount|affordable|deals?|buy|order|under\s+(?:rs\.?\s*)?\d[\d,.]*k?)\b/i,
   ],
   ["Comparison", /\b(?:vs\.?|versus|compare|comparison|alternatives?)\b/i],
   [
@@ -34,6 +34,8 @@ const reportIntents = [
     "Usage",
     /\b(?:how to|how long|how much|cook time|cooking time|temperature|settings|cleaning)\b/i,
   ],
+  ["Best / Review", /\b(?:best|top rated|reviews?|recommended)\b/i],
+  ["Local", /\b(?:near me|nearby|in my area)\b/i],
 ];
 const reportCityParents = new Map(
   Object.entries({
@@ -231,7 +233,7 @@ function reportReadLocation(name, rows, getTags) {
   const monthLabels = months.map(
     ({ label }) => label[0].toUpperCase() + label.slice(1),
   );
-  /** @type {Map<string, {keyword: string, volume: number, competition: number | null, lowBidInr: number | null, highBidInr: number | null, tier: number, quadrant: number, monthly: (number | null)[], brand: string, brandName: string, intents: number[]}>} */
+  /** @type {Map<string, {keyword: string, volume: number, competition: number | null, lowBidInr: number | null, highBidInr: number | null, tier: number, quadrant: number, monthly: (number | null)[], brand: string, brandName: string, intents: number[], sheetIntent: string}>} */
   const keywords = new Map();
   const tiers = reportTiers.map(() => 0);
   const quadrants = reportQuadrants.map(() => 0);
@@ -287,9 +289,11 @@ function reportReadLocation(name, rows, getTags) {
     const ratios = monthly.map((value) =>
       baseVolume && value !== null ? (100 * value) / baseVolume : null,
     );
-    if (tags.brand === "Branded") {
+    if (tags.brand === "Branded" || tags.brand === "Competitor brand") {
       branded++;
       brandedVolume += volume;
+    }
+    if (tags.brandName) {
       const stat = brandStats.get(tags.brandName) ?? {
         keywords: 0,
         volume: 0,
@@ -380,7 +384,7 @@ function reportExpandBrand(entry) {
  * Only the keyword workflow marks brands; the website workflow does not.
  */
 function reportSheetInfo(sources) {
-  const known = ["Keyword input", "Website Input"];
+  const known = ["Keyword input", "Keyword Suggestion"];
   const find = (wanted) =>
     sources.find(
       (source) =>
@@ -392,17 +396,31 @@ function reportSheetInfo(sources) {
   const brands = new Set();
   const intents = new Map();
   const brandKeywords = new Map();
-  const keywordInput = find("keyword input");
-  if (keywordInput) {
-    const [header = [], ...records] = reportParseCsv(keywordInput.text);
+  const keywordTags = new Map();
+  for (const name of known) {
+    const input = find(reportNormalize(name));
+    if (!input) continue;
+    let rows;
+    try {
+      rows = reportParseCsv(input.text);
+    } catch {
+      continue;
+    }
+    const [header = [], ...records] = rows;
     const intentColumn = column(header, "intent");
     const brandColumn = column(header, "brand");
+    const keywordColumn = column(header, "keyword");
     for (const row of records) {
       const intent = String(row[intentColumn] ?? "").trim();
-      if (intent) intents.set(intent, (intents.get(intent) ?? 0) + 1);
+      if (intent && name === "Keyword input")
+        intents.set(intent, (intents.get(intent) ?? 0) + 1);
       const brand = String(row[brandColumn] ?? "").trim();
+      const keyword = reportNormalize(row[keywordColumn]);
+      if (keyword && (intent || brand) && !keywordTags.has(keyword))
+        keywordTags.set(keyword, { intent, brand });
       if (brand) {
-        brandKeywords.set(brand, (brandKeywords.get(brand) ?? 0) + 1);
+        if (name === "Keyword input")
+          brandKeywords.set(brand, (brandKeywords.get(brand) ?? 0) + 1);
         brands.add(brand);
       }
     }
@@ -411,10 +429,16 @@ function reportSheetInfo(sources) {
     brands: [...new Set([...brands].map(reportExpandBrand))],
     intents,
     brandKeywords,
+    keywordTags,
   };
 }
 
-function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
+function reportBuild(
+  sources,
+  rawBrands,
+  locationNames = LOCATIONS,
+  aiLabels = new Map(),
+) {
   const sheetInfo = reportSheetInfo(sources);
   rawBrands = [rawBrands, ...sheetInfo.brands.filter((b) => !b.includes(","))]
     .filter(Boolean)
@@ -423,6 +447,7 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
   const errors = [];
   const seeds = new Set();
   const websiteSeeds = new Set();
+  const websiteHosts = new Set();
   const brands = new Set();
   const brandAliases = new Map();
   for (const entry of rawBrands.split(",")) {
@@ -448,9 +473,40 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
   function getTags(keyword) {
     if (!tagsByKeyword.has(keyword)) {
       const hit = brandPattern ? brandPattern.exec(keyword) : null;
+      const source = sheetInfo.keywordTags.get(keyword);
+      const ai = aiLabels.get(keyword);
+      const intent = reportNormalize(source?.intent);
+      const brandName = reportNormalize(source?.brand);
+      const brand =
+        intent === "competitor brand"
+          ? "Competitor brand"
+          : intent === "generic"
+            ? "Generic"
+            : brandName || intent === "branded" || hit
+              ? "Branded"
+              : ai?.brandType === "Own brand"
+                ? "Branded"
+                : ai?.brandType === "Competitor brand"
+                  ? "Competitor brand"
+                  : ai?.brandType === "Generic" || brandPattern
+                    ? "Generic"
+                    : "";
       tagsByKeyword.set(keyword, {
-        brand: brandPattern ? (hit ? "Branded" : "Generic") : "",
-        brandName: hit ? brandAliases.get(hit[1]) : "",
+        brand,
+        brandName:
+          brand === "Generic"
+            ? ""
+            : brandName
+              ? (brandAliases.get(brandName) ?? brandName)
+              : hit
+                ? brandAliases.get(hit[1])
+                : (ai?.brandName ?? ""),
+        sheetIntent:
+          (["branded", "competitor brand", "generic"].includes(intent)
+            ? ""
+            : source?.intent) ||
+          ai?.intent ||
+          "",
         intents: reportIntents.flatMap(([, rule], index) =>
           rule.test(keyword) ? [index] : [],
         ),
@@ -459,9 +515,12 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
     return tagsByKeyword.get(keyword);
   }
 
-  const knownNames = ["Keyword input", "Website Input", ...locationNames].sort(
-    (left, right) => right.length - left.length,
-  );
+  const knownNames = [
+    "Keyword input",
+    "Keyword Suggestion",
+    "Website Input",
+    ...locationNames,
+  ].sort((left, right) => right.length - left.length);
   const usedNames = new Set();
   for (const source of sources) {
     const name = reportFileLabel(source.name, knownNames);
@@ -471,6 +530,7 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
       if (!key || usedNames.has(key))
         throw new Error("Use one CSV per tab, with a unique file name.");
       const rows = reportParseCsv(source.text);
+      if (key === "keyword suggestion") continue;
       if (key === "keyword input" || key === "website input") {
         const [header = [], ...records] = rows;
         const column = header
@@ -479,6 +539,20 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
         if (column < 0) throw new Error("Expected the input tab’s header.");
         for (const row of records) {
           const value = reportNormalize(row[column]);
+          if (key === "website input" && value && !value.startsWith("kw:")) {
+            try {
+              const url = new URL(
+                value.includes("://") ? value : `https://${value}`,
+              );
+              if (
+                ["https:", "http:"].includes(url.protocol) &&
+                url.hostname.includes(".")
+              )
+                websiteHosts.add(url.hostname.replace(/^www\./, ""));
+            } catch {
+              // This row is not a website URL.
+            }
+          }
           if (key === "keyword input" && value) seeds.add(value);
           if (
             key === "website input" &&
@@ -537,11 +611,15 @@ function reportBuild(sources, rawBrands, locationNames = LOCATIONS) {
   const seenBrands = new Set(
     locations.flatMap((location) => [...location.brandStats.keys()]),
   );
+  const hasBrandLabels =
+    brands.size > 0 || [...tagsByKeyword.values()].some((tags) => tags.brand);
   return {
     locations,
     errors,
     unique: tagsByKeyword.size,
     brands: [...brands],
+    hasBrandLabels,
+    websiteHosts: [...websiteHosts],
     sheetBrandCount: sheetInfo.brands.length,
     sheetIntents: Object.fromEntries(
       [...sheetInfo.intents.entries()].sort((a, b) => b[1] - a[1]),
@@ -576,6 +654,44 @@ function reportBrandRows(location) {
       share: reportPercent(stat.volume, total),
     }))
     .sort((a, b) => b.volume - a.volume || a.brand.localeCompare(b.brand));
+}
+
+/** @param {{brand: string, sheetIntent: string, intents: number[]}} row */
+function reportKeywordIntents(row) {
+  return row.sheetIntent
+    ? [row.sheetIntent]
+    : row.intents.map((index) => reportIntents[index][0]);
+}
+
+/** @param {{brand: string, sheetIntent: string, intents: number[]}} row */
+function reportKeywordCategories(row) {
+  const intents = reportKeywordIntents(row);
+  return [
+    `brand:${row.brand || "Brand unclassified"}`,
+    ...(intents.length
+      ? intents.map((intent) => `intent:${intent}`)
+      : ["intent:No intent tag"]),
+  ];
+}
+
+/** @param {ReturnType<typeof reportReadLocation>} location */
+function reportClassification(location) {
+  const counts = new Map(
+    ["Branded", "Competitor brand", "Generic", "Brand unclassified"].map(
+      (label) => [`brand:${label}`, 0],
+    ),
+  );
+  for (const row of location.keywords.values()) {
+    for (const category of reportKeywordCategories(row))
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+  }
+  return [...counts].map(([value, count]) => ({
+    value,
+    group: value.startsWith("brand:") ? "Brand" : "Intent",
+    label: value.slice(value.indexOf(":") + 1),
+    count,
+    share: reportPercent(count, location.keywords.size),
+  }));
 }
 
 function reportVolumeShares(location) {
@@ -636,6 +752,41 @@ function reportPeak(trend) {
   );
 }
 
+/** @param {ReturnType<typeof reportReadLocation>} location */
+function reportTrendMovers(location) {
+  const last = location.monthLabels.length - 1;
+  const first = last - 2;
+  if (first < 0) return [];
+  const movers = [...location.keywords.values()].flatMap((row) => {
+    const from = row.monthly[first];
+    const to = row.monthly[last];
+    if (!from || to == null || from === to) return [];
+    return [
+      {
+        keyword: row.keyword,
+        from,
+        to,
+        change: to - from,
+        pct: (100 * (to - from)) / from,
+      },
+    ];
+  });
+  return [
+    ...movers
+      .filter((row) => row.change > 0)
+      .sort((a, b) => b.change - a.change)
+      .slice(0, 3),
+    ...movers
+      .filter((row) => row.change < 0)
+      .sort((a, b) => a.change - b.change)
+      .slice(0, 3),
+  ].map((row) => ({
+    ...row,
+    firstMonth: location.monthLabels[first],
+    lastMonth: location.monthLabels[last],
+  }));
+}
+
 /** Calculated facts and a limited set of keyword examples for the strategic read. */
 function reportFacts(report, selectedLocation) {
   const round = (value) =>
@@ -645,7 +796,7 @@ function reportFacts(report, selectedLocation) {
     report.locations[0];
   const focus = selectedLocation ?? home;
   const shares = (location) => ({
-    brandedPct: report.brands.length
+    brandedPct: report.hasBrandLabels
       ? round(reportPercent(location.branded, location.keywords.size))
       : null,
     ...Object.fromEntries(
@@ -687,6 +838,16 @@ function reportFacts(report, selectedLocation) {
     },
     keywordExamples: focus && {
       location: focus.name,
+      recentTrendMovers: reportTrendMovers(focus).map((row) => ({
+        ...row,
+        keyword: row.keyword.slice(0, 100),
+        pct: round(row.pct),
+      })),
+      ...(report.websiteHosts.length && {
+        keywordClassification: reportClassification(focus).map(
+          ({ group, label, count }) => ({ group, label, count }),
+        ),
+      }),
       examples: reportOpportunities(focus).map(({ label, row }) => ({
         signal: label,
         keyword: row.keyword.slice(0, 200),
@@ -738,7 +899,7 @@ function reportFacts(report, selectedLocation) {
         peakVolume: location.maxVolume,
         ...shares(location),
         reportedVolumeShare: {
-          branded: report.brands.length ? round(volumeShares.branded) : null,
+          branded: report.hasBrandLabels ? round(volumeShares.branded) : null,
           ...Object.fromEntries(
             volumeShares.intents.map((share, i) => [
               reportIntents[i][0],
@@ -824,7 +985,7 @@ function reportExportRows(report) {
       location.maxVolume,
       report.seedCount ? location.seedHits : "",
       fmt(reportPercent(location.seedHits, report.seedCount)),
-      report.brands.length
+      report.hasBrandLabels
         ? fmt(reportPercent(location.branded, location.keywords.size))
         : "",
       ...location.intentCounts.map((count) =>
@@ -836,6 +997,23 @@ function reportExportRows(report) {
     [],
     [
       "Location",
+      "Classification",
+      "Category",
+      "Keywords",
+      "Share of location keywords (%)",
+    ],
+    ...report.locations.flatMap((location) =>
+      reportClassification(location).map(({ group, label, count, share }) => [
+        location.name,
+        group,
+        label,
+        count,
+        fmt(share),
+      ]),
+    ),
+    [],
+    [
+      "Location",
       "Branded share of reported volume (%)",
       ...reportIntents.map(([name]) => `${name} share of reported volume (%)`),
     ],
@@ -843,7 +1021,7 @@ function reportExportRows(report) {
       const shares = reportVolumeShares(location);
       return [
         location.name,
-        report.brands.length ? fmt(shares.branded) : "",
+        report.hasBrandLabels ? fmt(shares.branded) : "",
         ...shares.intents.map(fmt),
       ];
     }),
@@ -864,7 +1042,7 @@ function reportExportRows(report) {
         fmt(location.cityState.volumeShare),
         location.cityState.pairs,
       ]),
-    ...(report.brands.length
+    ...(report.hasBrandLabels
       ? [
           [],
           [
@@ -921,6 +1099,29 @@ function reportExportRows(report) {
     [],
     [
       "Location",
+      "Keyword",
+      "Earlier month",
+      "Earlier searches",
+      "Latest month",
+      "Latest searches",
+      "Search change",
+      "Change (%)",
+    ],
+    ...report.locations.flatMap((location) =>
+      reportTrendMovers(location).map((row) => [
+        location.name,
+        row.keyword,
+        row.firstMonth,
+        row.from,
+        row.lastMonth,
+        row.to,
+        row.change,
+        fmt(row.pct),
+      ]),
+    ),
+    [],
+    [
+      "Location",
       "Month",
       "Seasonality index",
       "Baseline month",
@@ -945,8 +1146,12 @@ function reportExportRows(report) {
 export {
   reportBuild,
   reportBrandRows,
+  reportClassification,
+  reportKeywordCategories,
+  reportKeywordIntents,
   reportVolumeShares,
   reportOpportunities,
+  reportTrendMovers,
   reportPeak,
   reportFacts,
   reportExportRows,

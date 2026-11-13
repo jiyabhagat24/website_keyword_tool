@@ -4,6 +4,7 @@ import {
   reportExportRows,
   reportFacts,
   reportIntents,
+  reportKeywordIntents,
   reportQuadrants,
   reportSafeCsv,
   reportTiers,
@@ -67,7 +68,7 @@ function keywordRows(report: Report) {
         reportQuadrants[row.quadrant],
         row.brand,
         row.brandName,
-        row.intents.map((i: number) => reportIntents[i][0]).join(", "),
+        reportKeywordIntents(row).join(", "),
         ...labels.map((label) => {
           const index = at.get(label);
           return index === undefined ? "" : (row.monthly[index] ?? "");
@@ -175,7 +176,9 @@ function readme(
       "Brand list used: " +
         (report.brands.length
           ? report.brands.join(", ")
-          : "none supplied, so no brand analysis"),
+          : report.hasBrandLabels
+            ? "brand labels inferred during analysis"
+            : "no brand data supplied"),
       "Brands not found in any location: " +
         (report.absentBrands.length ? report.absentBrands.join(", ") : "none"),
       ...(report.errors.length
@@ -284,12 +287,12 @@ function readme(
       "Do not claim festive or seasonal effects when fewer than 12 months are present.",
     ]),
   ];
-  if (report.errors.length || !report.brands.length) {
+  if (report.errors.length || !report.hasBrandLabels) {
     sections.push(
       "",
       "## 7. Known gaps",
       list([
-        ...(!report.brands.length
+        ...(!report.hasBrandLabels
           ? [
               "No brand list was supplied, so brand share and absence were not calculated.",
             ]
@@ -340,7 +343,7 @@ export function buildClaudeBundle(
     },
     { name: "keywords_all_locations.csv", content: csv(keywordRows(report)) },
     { name: "locations_summary.csv", content: csv(reportExportRows(report)) },
-    ...(report.brands.length
+    ...(report.hasBrandLabels
       ? [{ name: "brands_by_location.csv", content: csv(brandRows(report)) }]
       : []),
     { name: "facts.json", content: JSON.stringify(facts, null, 2) },

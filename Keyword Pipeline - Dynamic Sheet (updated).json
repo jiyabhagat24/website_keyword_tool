@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "const body = $json.body || {};\n\n// Accept either a full Google Sheets URL or a raw sheet ID\nfunction extractSheetId(input) {\n  if (!input) return '';\n  const match = String(input).match(/\\/d\\/([a-zA-Z0-9-_]+)/);\n  return match ? match[1] : String(input).trim();\n}\n\nconst sheetId = extractSheetId(body.sheetUrl || body.sheetId);\nif (!sheetId) {\n  throw new Error('No sheetUrl or sheetId provided in the webhook body, or the sheet URL could not be parsed.');\n}\n\n// Historical metrics date range — defaults to trailing 12 months if not supplied\nconst MONTHS = [\"JANUARY\",\"FEBRUARY\",\"MARCH\",\"APRIL\",\"MAY\",\"JUNE\",\"JULY\",\"AUGUST\",\"SEPTEMBER\",\"OCTOBER\",\"NOVEMBER\",\"DECEMBER\"];\nconst now = new Date();\nconst endYear = body.endYear || now.getFullYear();\nconst endMonth = body.endMonth || MONTHS[now.getMonth()];\nconst startRef = new Date(now.getFullYear(), now.getMonth() - 11, 1);\nconst startYear = body.startYear || startRef.getFullYear();\nconst startMonth = body.startMonth || MONTHS[startRef.getMonth()];\n\n// Location targeting — allLocations (default true) pulls every configured\n// region; set it false and pass locations: [\"Maharashtra\", \"Bengaluru\", ...]\n// (tabName values from the Code in JavaScript node) to run a subset only.\n// Minimum average monthly searches a keyword needs to be kept. Default 500;\n// pass minVolume: 0 in the webhook body to keep every keyword (no volume floor).\nconst minVolume = body.minVolume !== undefined ? Number(body.minVolume) : 500;\n\nconst allLocations = body.allLocations !== undefined ? !!body.allLocations : true;\nconst locations = Array.isArray(body.locations) ? body.locations : [];\n\nreturn [{\n  json: {\n    sheetId,\n    allLocations,\n    locations,\n    minVolume,\n    startYear,\n    startMonth,\n    endYear,\n    endMonth\n  }\n}];"
+        "jsCode": "const body = $json.body || {};\nconst runId = /^[a-f0-9]{24}$/.test(String(body.runId ?? '')) ? String(body.runId) : '';\nconst runChain = Number.isInteger(body.runChain) && body.runChain >= 0 && body.runChain < 4 ? body.runChain : 0;\n\n// Accept either a full Google Sheets URL or a raw sheet ID\nfunction extractSheetId(input) {\n  if (!input) return '';\n  const match = String(input).match(/\\/d\\/([a-zA-Z0-9-_]+)/);\n  return match ? match[1] : String(input).trim();\n}\n\nconst sheetId = extractSheetId(body.sheetUrl || body.sheetId);\nif (!sheetId) {\n  throw new Error('No sheetUrl or sheetId provided in the webhook body, or the sheet URL could not be parsed.');\n}\n\n// Historical metrics date range — defaults to trailing 12 months if not supplied\nconst MONTHS = [\"JANUARY\",\"FEBRUARY\",\"MARCH\",\"APRIL\",\"MAY\",\"JUNE\",\"JULY\",\"AUGUST\",\"SEPTEMBER\",\"OCTOBER\",\"NOVEMBER\",\"DECEMBER\"];\nconst now = new Date();\nconst endYear = body.endYear || now.getFullYear();\nconst endMonth = body.endMonth || MONTHS[now.getMonth()];\nconst startRef = new Date(now.getFullYear(), now.getMonth() - 11, 1);\nconst startYear = body.startYear || startRef.getFullYear();\nconst startMonth = body.startMonth || MONTHS[startRef.getMonth()];\n\n// Location targeting — allLocations (default true) pulls every configured\n// region; set it false and pass locations: [\"Maharashtra\", \"Bengaluru\", ...]\n// (tabName values from the Code in JavaScript node) to run a subset only.\n// Minimum average monthly searches a keyword needs to be kept. Default 500;\n// pass minVolume: 0 in the webhook body to keep every keyword (no volume floor).\nconst minVolume = body.minVolume !== undefined ? Number(body.minVolume) : 500;\n\nconst allLocations = body.allLocations !== undefined ? !!body.allLocations : true;\nconst locations = Array.isArray(body.locations) ? body.locations : [];\n\nreturn [{\n  json: {\n    sheetId,\n    runId,\n    runChain,\n    allLocations,\n    locations,\n    minVolume,\n    startYear,\n    startMonth,\n    endYear,\n    endMonth\n  }\n}];"
       },
       "name": "Config",
       "type": "n8n-nodes-base.code",
@@ -578,6 +578,117 @@
         },
         "options": {}
       }
+    },
+    {
+      "id": "0419990d-075c-46e6-b5f5-99403db87a62",
+      "name": "Track Collection?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1770,
+        170
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a72e511a-17db-4f63-b926-2970f8fcd333",
+              "leftValue": "={{ Boolean($('Config').first().json.runId) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "03c07c7d-56f4-470b-9d14-f78ecbf11db2",
+      "name": "Create Collection Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1570,
+        170
+      ],
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.sheetId }}:batchUpdate",
+        "method": "POST",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const cfg = $('Config').first().json; const sheetId = Math.floor(Math.random()*1900000000)+1; return JSON.stringify({requests:[{addSheet:{properties:{sheetId,title:'Collection '+cfg.runId,gridProperties:{rowCount:6,columnCount:2}}}},{updateCells:{start:{sheetId,rowIndex:0,columnIndex:0},rows:[{values:[{userEnteredValue:{stringValue:cfg.runId}},{userEnteredValue:{numberValue:1}}]}],fields:'userEnteredValue'}}]}); })() }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "e0fbb90e-a8f8-4e9b-960f-ac5d19007dcd",
+      "name": "Track Completion?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3170,
+        450
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "400d556a-c922-412a-b5c4-50899b31b0a7",
+              "leftValue": "={{ Boolean($('Config').first().json.runId) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "21ae4c2d-7fde-4809-8cfb-cac9d49d7e3a",
+      "name": "Mark Collection Complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3390,
+        450
+      ],
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.sheetId }}/values/{{ encodeURIComponent(\"'Collection \" + $('Config').first().json.runId + \"'!A\" + ($('Config').first().json.runChain + 2)) }}?valueInputOption=RAW",
+        "method": "PUT",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({values: [['complete']]}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "executeOnce": true
     }
   ],
   "connections": {
@@ -585,7 +696,7 @@
       "main": [
         [
           {
-            "node": "Read Keywords from Sheet",
+            "node": "Track Collection?",
             "type": "main",
             "index": 0
           }
@@ -669,7 +780,7 @@
       "main": [
         [
           {
-            "node": "Respond to Webhook",
+            "node": "Track Completion?",
             "type": "main",
             "index": 0
           }
@@ -832,6 +943,64 @@
         [
           {
             "node": "Build Sheet Write Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Collection?": {
+      "main": [
+        [
+          {
+            "node": "Create Collection Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Keywords from Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Collection Status": {
+      "main": [
+        [
+          {
+            "node": "Read Keywords from Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Completion?": {
+      "main": [
+        [
+          {
+            "node": "Mark Collection Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Collection Complete": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
