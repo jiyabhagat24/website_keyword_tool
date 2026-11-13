@@ -656,14 +656,14 @@ function reportBrandRows(location) {
     .sort((a, b) => b.volume - a.volume || a.brand.localeCompare(b.brand));
 }
 
-/** @param {{brand: string, sheetIntent: string, intents: number[]}} row */
+/** @param {{brand: string, sheetIntent?: string, intents: number[]}} row */
 function reportKeywordIntents(row) {
   return row.sheetIntent
     ? [row.sheetIntent]
     : row.intents.map((index) => reportIntents[index][0]);
 }
 
-/** @param {{brand: string, sheetIntent: string, intents: number[]}} row */
+/** @param {{brand: string, sheetIntent?: string, intents: number[]}} row */
 function reportKeywordCategories(row) {
   const intents = reportKeywordIntents(row);
   return [
