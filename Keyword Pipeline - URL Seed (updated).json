@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "jsCode": "const body = $json.body || {};\n\n// Accept either a full Google Sheets URL or a raw sheet ID\nfunction extractSheetId(input) {\n  if (!input) return '';\n  const match = String(input).match(/\\/d\\/([a-zA-Z0-9-_]+)/);\n  return match ? match[1] : String(input).trim();\n}\n\nconst sheetId = extractSheetId(body.sheetUrl || body.sheetId);\nif (!sheetId) {\n  throw new Error('No sheetUrl or sheetId provided in the webhook body, or the sheet URL could not be parsed.');\n}\n\n// Historical metrics date range — defaults to trailing 12 months if not supplied\nconst MONTHS = [\"JANUARY\",\"FEBRUARY\",\"MARCH\",\"APRIL\",\"MAY\",\"JUNE\",\"JULY\",\"AUGUST\",\"SEPTEMBER\",\"OCTOBER\",\"NOVEMBER\",\"DECEMBER\"];\nconst now = new Date();\nconst endYear = body.endYear || now.getFullYear();\nconst endMonth = body.endMonth || MONTHS[now.getMonth()];\nconst startRef = new Date(now.getFullYear(), now.getMonth() - 11, 1);\nconst startYear = body.startYear || startRef.getFullYear();\nconst startMonth = body.startMonth || MONTHS[startRef.getMonth()];\n\n// Location targeting — allLocations (default true) pulls every configured\n// region; set it false and pass locations: [\"Maharashtra\", \"Bengaluru\", ...]\n// (tabName values from the Code in JavaScript node) to run a subset only.\nconst allLocations = body.allLocations !== undefined ? !!body.allLocations : true;\nconst locations = Array.isArray(body.locations) ? body.locations : [];\n\n// Minimum average monthly searches a keyword needs to be kept. Default 500;\n// pass minVolume: 0 in the webhook body to keep every keyword (no volume floor).\nconst minVolume = body.minVolume !== undefined ? Number(body.minVolume) : 500;\n\n// phase: 'ideas' = only collect keywords from the websites, 'states' = only fill\n// the location tabs, 'all' (default) = both. Several 'states' runs can go in\n// parallel as long as each one gets a different `locations` list.\nconst phase = ['ideas', 'states'].includes(String(body.phase)) ? String(body.phase) : 'all';\n\n// Pause after every Google Ads historical-metrics call, per run (default 3s).\n// Total request rate = parallel runs / (call time + waitSeconds).\nconst waitSeconds = body.waitSeconds !== undefined ? Math.max(0, Number(body.waitSeconds)) : 3;\n\n// Most new websites one run will process (default 30). Websites already done are\n// skipped, so run again to continue with the next ones. Keeps one run's data small.\nconst maxSites = body.maxSites !== undefined ? Math.max(1, Number(body.maxSites)) : 30;\n\n// onlySites: [\"reginaldmen.com\"] = process just these websites (even if they were\n// done before) and nothing else. Keywords already in the sheet are never added twice.\nconst onlySites = Array.isArray(body.onlySites) ? body.onlySites.map(String) : [];\n\nreturn [{\n  json: {\n    sheetId,\n    allLocations,\n    locations,\n    minVolume,\n    phase,\n    waitSeconds,\n    maxSites,\n    onlySites,\n    startYear,\n    startMonth,\n    endYear,\n    endMonth\n  }\n}];"
+        "jsCode": "const body = $json.body || {};\nconst runId = /^[a-f0-9]{24}$/.test(String(body.runId ?? '')) ? String(body.runId) : '';\nconst runChain = Number.isInteger(body.runChain) && body.runChain >= 0 && body.runChain < 4 ? body.runChain : 0;\n\n// Accept either a full Google Sheets URL or a raw sheet ID\nfunction extractSheetId(input) {\n  if (!input) return '';\n  const match = String(input).match(/\\/d\\/([a-zA-Z0-9-_]+)/);\n  return match ? match[1] : String(input).trim();\n}\n\nconst sheetId = extractSheetId(body.sheetUrl || body.sheetId);\nif (!sheetId) {\n  throw new Error('No sheetUrl or sheetId provided in the webhook body, or the sheet URL could not be parsed.');\n}\n\n// Historical metrics date range — defaults to trailing 12 months if not supplied\nconst MONTHS = [\"JANUARY\",\"FEBRUARY\",\"MARCH\",\"APRIL\",\"MAY\",\"JUNE\",\"JULY\",\"AUGUST\",\"SEPTEMBER\",\"OCTOBER\",\"NOVEMBER\",\"DECEMBER\"];\nconst now = new Date();\nconst endYear = body.endYear || now.getFullYear();\nconst endMonth = body.endMonth || MONTHS[now.getMonth()];\nconst startRef = new Date(now.getFullYear(), now.getMonth() - 11, 1);\nconst startYear = body.startYear || startRef.getFullYear();\nconst startMonth = body.startMonth || MONTHS[startRef.getMonth()];\n\n// Location targeting — allLocations (default true) pulls every configured\n// region; set it false and pass locations: [\"Maharashtra\", \"Bengaluru\", ...]\n// (tabName values from the Code in JavaScript node) to run a subset only.\nconst allLocations = body.allLocations !== undefined ? !!body.allLocations : true;\nconst locations = Array.isArray(body.locations) ? body.locations : [];\n\n// Minimum average monthly searches a keyword needs to be kept. Default 500;\n// pass minVolume: 0 in the webhook body to keep every keyword (no volume floor).\nconst minVolume = body.minVolume !== undefined ? Number(body.minVolume) : 500;\n\n// phase: 'ideas' = only collect keywords from the websites, 'states' = only fill\n// the location tabs, 'all' (default) = both. Several 'states' runs can go in\n// parallel as long as each one gets a different `locations` list.\nconst phase = ['ideas', 'states'].includes(String(body.phase)) ? String(body.phase) : 'all';\n\n// Pause after every Google Ads historical-metrics call, per run (default 3s).\n// Total request rate = parallel runs / (call time + waitSeconds).\nconst waitSeconds = body.waitSeconds !== undefined ? Math.max(0, Number(body.waitSeconds)) : 3;\n\n// Most new websites one run will process (default 30). Websites already done are\n// skipped, so run again to continue with the next ones. Keeps one run's data small.\nconst maxSites = body.maxSites !== undefined ? Math.max(1, Number(body.maxSites)) : 30;\n\n// onlySites: [\"reginaldmen.com\"] = process just these websites (even if they were\n// done before) and nothing else. Keywords already in the sheet are never added twice.\nconst onlySites = Array.isArray(body.onlySites) ? body.onlySites.map(String) : [];\n\nreturn [{\n  json: {\n    sheetId,\n    runId,\n    runChain,\n    allLocations,\n    locations,\n    minVolume,\n    phase,\n    waitSeconds,\n    maxSites,\n    onlySites,\n    startYear,\n    startMonth,\n    endYear,\n    endMonth\n  }\n}];"
       },
       "name": "Config",
       "type": "n8n-nodes-base.code",
@@ -769,7 +769,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Split the locations into groups of 6 tabs and run 4 chains in parallel.\n// Each chain runs its groups one after the other, then runs them again once\n// (second pass fills any keywords Google missed the first time).\nconst cfg = $('Config').first().json;\nconst tabs = $('Code in JavaScript').all().map(i => i.json.tabName);\nconst SIZE = 6, CHAINS = 4;\nconst groups = [];\nfor (let i = 0; i < tabs.length; i += SIZE) groups.push(tabs.slice(i, i + SIZE));\nconst chains = Array.from({ length: Math.min(CHAINS, groups.length) }, () => []);\ngroups.forEach((g, i) => chains[i % chains.length].push(g));\nconst base = {\n  sheetUrl: `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/edit`,\n  phase: 'states', allLocations: false, minVolume: cfg.minVolume, waitSeconds: cfg.waitSeconds,\n  startYear: cfg.startYear, startMonth: cfg.startMonth, endYear: cfg.endYear, endMonth: cfg.endMonth,\n  isChild: true\n};\nreturn chains.map((runs) => {\n  const seq = [...runs, ...runs];\n  const [first, ...rest] = seq;\n  return { json: { body: { ...base, locations: first, chain: rest } }, pairedItem: { item: 0 } };\n});"
+        "jsCode": "// Split the locations into groups of 6 tabs and run 4 chains in parallel.\n// Each chain runs its groups one after the other, then runs them again once\n// (second pass fills any keywords Google missed the first time).\nconst cfg = $('Config').first().json;\nconst tabs = $('Code in JavaScript').all().map(i => i.json.tabName);\nconst SIZE = 6, CHAINS = 4;\nconst groups = [];\nfor (let i = 0; i < tabs.length; i += SIZE) groups.push(tabs.slice(i, i + SIZE));\nconst chains = Array.from({ length: Math.min(CHAINS, groups.length) }, () => []);\ngroups.forEach((g, i) => chains[i % chains.length].push(g));\nconst base = {\n  sheetUrl: `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/edit`,\n  phase: 'states', allLocations: false, minVolume: cfg.minVolume, waitSeconds: cfg.waitSeconds,\n  startYear: cfg.startYear, startMonth: cfg.startMonth, endYear: cfg.endYear, endMonth: cfg.endMonth,\n  isChild: true\n};\nreturn chains.map((runs, runChain) => {\n  const seq = [...runs, ...runs];\n  const [first, ...rest] = seq;\n  return { json: { body: { ...base, locations: first, chain: rest, runId: cfg.runId, runChain } }, pairedItem: { item: 0 } };\n});"
       },
       "id": "15a94a1a-3154-44da-861b-347309175e18",
       "name": "Build Parallel Runs",
@@ -837,7 +837,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// This run is part of a chain: start the next group of the chain.\nconst cfg = $('Config').first().json;\nconst body = $('Webhook').first().json.body || {};\nconst [next, ...rest] = body.chain || [];\nreturn [{ json: { body: {\n  sheetUrl: `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/edit`,\n  phase: 'states', allLocations: false, minVolume: cfg.minVolume, waitSeconds: cfg.waitSeconds,\n  startYear: cfg.startYear, startMonth: cfg.startMonth, endYear: cfg.endYear, endMonth: cfg.endMonth,\n  isChild: true, locations: next, chain: rest\n} }, pairedItem: { item: 0 } }];"
+        "jsCode": "// This run is part of a chain: start the next group of the chain.\nconst cfg = $('Config').first().json;\nconst body = $('Webhook').first().json.body || {};\nconst [next, ...rest] = body.chain || [];\nreturn [{ json: { body: {\n  sheetUrl: `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/edit`,\n  phase: 'states', allLocations: false, minVolume: cfg.minVolume, waitSeconds: cfg.waitSeconds,\n  startYear: cfg.startYear, startMonth: cfg.startMonth, endYear: cfg.endYear, endMonth: cfg.endMonth,\n  isChild: true, locations: next, chain: rest, runId: cfg.runId, runChain: cfg.runChain\n} }, pairedItem: { item: 0 } }];"
       },
       "id": "e474df7c-9212-48c3-bffe-fac5f78025ad",
       "name": "Build Next Run",
@@ -883,6 +883,131 @@
         2912,
         0
       ]
+    },
+    {
+      "id": "7070d206-913f-457b-bc3d-b3323461aa85",
+      "name": "Track Collection?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1770,
+        170
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0827b0d5-bb53-4622-aa22-17a3a7e6534d",
+              "leftValue": "={{ Boolean($('Config').first().json.runId) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "badab412-8933-448a-bf08-8f39513f28e1",
+      "name": "Create Collection Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1570,
+        170
+      ],
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.sheetId }}:batchUpdate",
+        "method": "POST",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const cfg = $('Config').first().json; const sheetId = Math.floor(Math.random()*1900000000)+1; return JSON.stringify({requests:[{addSheet:{properties:{sheetId,title:'Collection '+cfg.runId,gridProperties:{rowCount:6,columnCount:2}}}},{updateCells:{start:{sheetId,rowIndex:0,columnIndex:0},rows:[{values:[{userEnteredValue:{stringValue:cfg.runId}},{userEnteredValue:{numberValue:$('Build Parallel Runs').all().length}}]}],fields:'userEnteredValue'}}]}); })() }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "0e4ee0f0-6bc3-476c-bdbc-f9b922df58cb",
+      "name": "Restore Parallel Runs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2890,
+        -240
+      ],
+      "parameters": {
+        "jsCode": "return $('Build Parallel Runs').all().map((item) => ({json:item.json}));"
+      }
+    },
+    {
+      "id": "1b9eebdb-a768-40e4-bc9f-717c0db86262",
+      "name": "Track Completion?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3170,
+        450
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5d00b0b4-0917-4dc2-9775-ce4e3464b9db",
+              "leftValue": "={{ Boolean($('Config').first().json.runId) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "64667b35-8a99-4a55-b202-13731c9fc815",
+      "name": "Mark Collection Complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3390,
+        450
+      ],
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Config').first().json.sheetId }}/values/{{ encodeURIComponent(\"'Collection \" + $('Config').first().json.runId + \"'!A\" + ($('Config').first().json.runChain + 2)) }}?valueInputOption=RAW",
+        "method": "PUT",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({values: [['complete']]}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "executeOnce": true
     }
   ],
   "connections": {
@@ -1294,7 +1419,7 @@
       "main": [
         [
           {
-            "node": "Start Parallel Runs",
+            "node": "Track Collection?",
             "type": "main",
             "index": 0
           }
@@ -1312,7 +1437,7 @@
         ],
         [
           {
-            "node": "Respond to Webhook",
+            "node": "Track Completion?",
             "type": "main",
             "index": 0
           }
@@ -1346,6 +1471,75 @@
         [
           {
             "node": "Respond Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Collection?": {
+      "main": [
+        [
+          {
+            "node": "Create Collection Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Start Parallel Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Parallel Runs": {
+      "main": [
+        [
+          {
+            "node": "Start Parallel Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Collection Status": {
+      "main": [
+        [
+          {
+            "node": "Restore Parallel Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Track Completion?": {
+      "main": [
+        [
+          {
+            "node": "Mark Collection Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Collection Complete": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }

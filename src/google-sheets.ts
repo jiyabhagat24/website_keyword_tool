@@ -2,7 +2,11 @@ import { LOCATIONS } from "./config";
 
 const publicApiKey = import.meta.env.VITE_GOOGLE_SHEETS_API_KEY?.trim();
 const locations = new Set(LOCATIONS.map((name) => name.toLowerCase()));
-const inputTabs = new Set(["keyword input", "website input"]);
+const inputTabs = new Set([
+  "keyword input",
+  "keyword suggestion",
+  "website input",
+]);
 
 export function sheetIdFromInput(value: string): string | null {
   const text = value.trim();
