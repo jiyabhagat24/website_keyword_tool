@@ -60,6 +60,10 @@ const INTENT_MEANING: Record<string, string> = {
   Ingredient: "an active ingredient",
   Comparison: "comparing options",
   Local: "near me or nearby",
+  Price: "price, cost or budget",
+  Doubt: "is it safe, side effects, worth it",
+  Usage: "how to use or apply it",
+  Recipe: "recipes",
 };
 
 const fmt = (value: number | null | undefined) =>
@@ -405,75 +409,98 @@ export default function ReportDashboard({
     return { national, states, cities };
   }, [report]);
 
-  const lines: ReactNode[] = [];
+  const lines: { tag: string; text: ReactNode }[] = [];
   if (sorted[0]) {
     const [a, b] = sorted;
-    lines.push(
-      <>
-        <b className="hl">{a.keyword}</b> leads at {fmt(a.volume)} monthly
-        searches
-        {b
-          ? a.volume === b.volume
-            ? `, tied with ${b.keyword}.`
-            : `, ahead of ${b.keyword} at ${fmt(b.volume)}.`
-          : "."}
-      </>,
-    );
+    lines.push({
+      tag: "Leader",
+      text: (
+        <>
+          <b className="hl">{a.keyword}</b> leads at {fmt(a.volume)} monthly
+          searches
+          {b
+            ? a.volume === b.volume
+              ? `, tied with ${b.keyword}.`
+              : `, ahead of ${b.keyword} at ${fmt(b.volume)}.`
+            : "."}
+        </>
+      ),
+    });
   }
   if (hasBrands && brandRows[0]) {
-    lines.push(
-      <>
-        <b className="hl">{brandRows[0].brand}</b> holds{" "}
-        {fmt(brandRows[0].share)}% of branded search volume here, and{" "}
-        {fmt(share(loc.branded, total))}% of all keywords name a brand.
-      </>,
-    );
+    lines.push({
+      tag: "Brands",
+      text: (
+        <>
+          <b className="hl">{brandRows[0].brand}</b> holds{" "}
+          {fmt(brandRows[0].share)}% of branded search volume here, and{" "}
+          {fmt(share(loc.branded, total))}% of all keywords name a brand.
+        </>
+      ),
+    });
   } else {
-    lines.push(
-      <>
-        No brand names are marked yet, so branded share is not measured. Add
-        them when you build the report.
-      </>,
-    );
+    lines.push({
+      tag: "Brands",
+      text: (
+        <>
+          No brand names are marked yet, so branded share is not measured. Add
+          them when you build the report.
+        </>
+      ),
+    });
   }
   if (peak && trough && seasonal.length > 2) {
-    lines.push(
-      <>
-        Search level peaks in <b className="hl">{peak.label}</b> at{" "}
-        {fmt(Math.round(peak.index))} and is lowest in{" "}
-        <b className="hl">{trough.label}</b> at {fmt(Math.round(trough.index))}{" "}
-        ({loc.baselineLabel} = 100). The cheapest window to build recall is
-        around the trough, before everyone crowds in.
-      </>,
-    );
+    lines.push({
+      tag: "Season",
+      text: (
+        <>
+          Search level peaks in <b className="hl">{peak.label}</b> at{" "}
+          {fmt(Math.round(peak.index))} and is lowest in{" "}
+          <b className="hl">{trough.label}</b> at{" "}
+          {fmt(Math.round(trough.index))} ({loc.baselineLabel} = 100). The
+          cheapest window to build recall is around the trough, before everyone
+          crowds in.
+        </>
+      ),
+    });
   }
   if (open.length) {
-    lines.push(
-      <>
-        <b className="hl">{fmt(open.length)}</b> keywords have real volume and a
-        competition index under 50. The largest is{" "}
-        <b className="hl">{open[0].keyword}</b> at {fmt(open[0].volume)}. These
-        are candidates to test in content or paid search.
-      </>,
-    );
+    lines.push({
+      tag: "Open ground",
+      text: (
+        <>
+          <b className="hl">{fmt(open.length)}</b> keywords have real volume and
+          a competition index under 50. The largest is{" "}
+          <b className="hl">{open[0].keyword}</b> at {fmt(open[0].volume)}.
+          These are candidates to test in content or paid search.
+        </>
+      ),
+    });
   } else {
-    lines.push(
-      <>
-        No keyword with a recorded competition score pairs at least 1,000
-        searches with a score under 50.
-      </>,
-    );
+    lines.push({
+      tag: "Open ground",
+      text: (
+        <>
+          No keyword with a recorded competition score pairs at least 1,000
+          searches with a score under 50.
+        </>
+      ),
+    });
   }
   if (priceCount) {
-    lines.push(
-      <>
-        Price and buying intent is{" "}
-        <b className="hl">{fmt(share(priceCount, total))}%</b> of keywords in
-        this market.
-      </>,
-    );
+    lines.push({
+      tag: "Price",
+      text: (
+        <>
+          Price and buying intent is{" "}
+          <b className="hl">{fmt(share(priceCount, total))}%</b> of keywords in
+          this market.
+        </>
+      ),
+    });
   }
 
+  const [showNotes, setShowNotes] = useState(false);
   const [q, setQ] = useState("");
   const [intentFilter, setIntentFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
@@ -573,93 +600,113 @@ export default function ReportDashboard({
   const noIntent = intentCounts.get("No intent tag") ?? 0;
 
   return (
-    <section className="dash" aria-labelledby="report-title">
-      <header className="dash-head">
-        <div>
-          <h2 id="report-title" tabIndex={-1} ref={headingRef}>
-            Search demand monitor
-          </h2>
-          <p className="sub">
-            Keyword Planner · {report.locations.length} markets ·{" "}
-            {fmt(report.unique)} keywords with demand
-          </p>
-        </div>
-        <div className="dash-controls">
-          <div className="field">
-            <label htmlFor="dash-market">Market</label>
-            <select
-              id="dash-market"
-              value={locationIndex}
-              onChange={(e) => {
-                onLocation(Number(e.target.value));
-                setPage(0);
-                setOpenKeyword("");
-                setIntentFilter("");
-                setBrandFilter("");
-              }}
-            >
-              {groups.national.map(({ l, i }) => (
-                <option key={l.name} value={i}>
-                  {l.name}
-                </option>
-              ))}
-              {groups.states.length > 0 && (
-                <optgroup label="States and UTs">
-                  {groups.states.map(({ l, i }) => (
-                    <option key={l.name} value={i}>
-                      {l.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {groups.cities.length > 0 && (
-                <optgroup label="Cities and metro regions">
-                  {groups.cities.map(({ l, i }) => (
-                    <option key={l.name} value={i}>
-                      {l.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
+    <section
+      className={"dash" + (showNotes ? " notes" : "")}
+      aria-labelledby="report-title"
+    >
+      <div className="bar">
+        <div className="bar-in">
+          <div className="brand">
+            <h2 id="report-title" tabIndex={-1} ref={headingRef}>
+              Search Demand Monitor
+            </h2>
+            <span className="sub">
+              Keyword Planner · {report.locations.length} markets ·{" "}
+              {fmt(report.unique)} keywords
+            </span>
           </div>
-          <div className="dash-actions">{actions}</div>
+          <div className="ctrls">
+            <div className="field">
+              <label htmlFor="dash-market">Market</label>
+              <select
+                id="dash-market"
+                value={locationIndex}
+                onChange={(e) => {
+                  onLocation(Number(e.target.value));
+                  setPage(0);
+                  setOpenKeyword("");
+                  setIntentFilter("");
+                  setBrandFilter("");
+                }}
+              >
+                {groups.national.map(({ l, i }) => (
+                  <option key={l.name} value={i}>
+                    {l.name}
+                  </option>
+                ))}
+                {groups.states.length > 0 && (
+                  <optgroup label="States and UTs">
+                    {groups.states.map(({ l, i }) => (
+                      <option key={l.name} value={i}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {groups.cities.length > 0 && (
+                  <optgroup label="Cities and metro regions">
+                    {groups.cities.map(({ l, i }) => (
+                      <option key={l.name} value={i}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="toggle"
+              aria-pressed={showNotes}
+              onClick={() => setShowNotes(!showNotes)}
+            >
+              <span className="dot" />
+              Build notes
+            </button>
+            {actions}
+          </div>
         </div>
-      </header>
+      </div>
 
       <div className="kpis">
         <div className="kpi">
-          <span>Keywords with demand</span>
-          <b>{fmt(total)}</b>
-          <small>{fmt(loc.buckets)} distinct volume levels</small>
+          <span className="k">Keywords with demand</span>
+          <span className="v">{fmt(total)}</span>
+          <span className="d">{fmt(loc.buckets)} distinct volume levels</span>
         </div>
         <div className="kpi">
-          <span>Branded</span>
-          <b>{hasBrands ? fmt(share(loc.branded, total)) + "%" : "—"}</b>
-          <small>
+          <span className="k">Branded</span>
+          <span className="v">
+            {hasBrands ? fmt(share(loc.branded, total)) + "%" : "—"}
+          </span>
+          <span className="d">
             {hasBrands ? "of keywords name a brand" : "no brand names set"}
-          </small>
+          </span>
         </div>
         <div className="kpi">
-          <span>Price intent</span>
-          <b>{priceCount ? fmt(share(priceCount, total)) + "%" : "—"}</b>
-          <small>of keywords in this market</small>
+          <span className="k">Price intent</span>
+          <span className="v">
+            {priceCount ? fmt(share(priceCount, total)) + "%" : "—"}
+          </span>
+          <span className="d">of keywords in this market</span>
         </div>
         <div className="kpi">
-          <span>Latest vs {loc.baselineLabel?.split(" ")[0] ?? "start"}</span>
-          <b>
+          <span className="k">
+            Latest vs {loc.baselineLabel?.split(" ")[0] ?? "start"}
+          </span>
+          <span className="v">
             {latest
               ? (latest.index >= 100 ? "+" : "") +
                 fmt(Math.round(latest.index - 100)) +
                 "%"
               : "—"}
-          </b>
-          <small>{latest ? latest.label : "no month data"}</small>
+          </span>
+          <span className="d">{latest ? latest.label : "no month data"}</span>
         </div>
         <div className="kpi">
-          <span>Open keywords</span>
-          <b>{fmt(open.length)}</b>
-          <small>volume over 1,000, competition under 50</small>
+          <span className="k">Open keywords</span>
+          <span className="v">{fmt(open.length)}</span>
+          <span className="d">volume over 1,000, competition under 50</span>
         </div>
       </div>
 
@@ -674,15 +721,20 @@ export default function ReportDashboard({
         </p>
         <ul>
           {lines.map((line, i) => (
-            <li key={i}>{line}</li>
+            <li key={i}>
+              <span className="tag">{line.tag}</span>
+              <span>{line.text}</span>
+            </li>
           ))}
+          <li>
+            <span className="tag">Read with care</span>
+            <span>
+              Google rounds volume into bands: these {fmt(total)} keywords share
+              only <b>{fmt(loc.buckets)}</b> distinct values. Treat volume as a
+              tier, not a figure, and never add the column up.
+            </span>
+          </li>
         </ul>
-        <div className="note">
-          <b>Read with care</b>
-          Google rounds volume into bands: these {fmt(total)} keywords share
-          only <b>{fmt(loc.buckets)}</b> distinct values. Treat volume as a
-          tier, not a figure, and never add the column up.
-        </div>
       </div>
 
       <div className="grid">
@@ -699,6 +751,12 @@ export default function ReportDashboard({
               ? `${seasonal.length} months cannot separate a festive peak from category growth, so read direction, not season.`
               : "Twelve months or more allows a seasonal read."}
           </p>
+          <div className="note">
+            <b>Build note</b>
+            Search level is the median of each keyword&apos;s monthly searches
+            divided by its first-month value, times 100. It avoids adding
+            rounded volumes together.
+          </div>
           {seasonal.length ? (
             <MonthBars
               labels={seasonal.map((m) => m.label)}
@@ -719,6 +777,11 @@ export default function ReportDashboard({
             fewer advertisers bidding. The shaded band is where content wins
             cheaply.
           </p>
+          <div className="note">
+            <b>Build note</b>x is the competition index (0 to 100, advertisers
+            bidding). y is monthly searches on a log scale. The shaded band is
+            volume of 1,000 or more with competition under 50.
+          </div>
           <OpportunityMap rows={rows} />
         </div>
       </div>
@@ -755,6 +818,12 @@ export default function ReportDashboard({
             in the category, not simply the biggest advertiser. Volumes add
             rounded values, so they are a guide.
           </p>
+          <div className="note">
+            <b>Build note</b>
+            Brand matches come from the brand list, the Sheet&apos;s Brand
+            column, or the AI labels. Shares add rounded volumes, so read them
+            as a guide.
+          </div>
           {brandRows.length ? (
             <Bars
               accent="var(--s2)"
@@ -1012,8 +1081,7 @@ export default function ReportDashboard({
                       {signal ? (
                         <span
                           className={
-                            "tag " +
-                            (signal === "Open ground" ? "good" : "warn")
+                            "pill" + (signal === "Open ground" ? " op" : "")
                           }
                         >
                           {signal}
@@ -1098,13 +1166,22 @@ export default function ReportDashboard({
           </div>
         </div>
       )}
-      <div className="panel notes">
+      <div className="panel contract">
         <div className="phead">
-          <h3>Build notes</h3>
-          <span className="meta">how to read this page</span>
+          <h3>How this gets built</h3>
+          <span className="meta">data contract</span>
         </div>
         <div className="grid">
           <div>
+            <h4>The swap point</h4>
+            <pre>{`Sheet tabs  India, 47 state and city tabs, Keyword input
+Each tab    Keyword | search volume | competition index
+            low bid | high bid | one column per month
+Keyword input  Keyword | Intent | Brand (optional)`}</pre>
+            <p>
+              Refill the Sheet from a fresh collection and the whole page
+              updates, summary included. Nothing in the layout has to change.
+            </p>
             <h4>Where each number comes from</h4>
             <div className="maprow">
               <code>volume</code>
