@@ -1163,6 +1163,13 @@ export default function ReportDashboard({
           Written from the calculated summary and keyword examples for{" "}
           {loc.name}. It goes to OpenAI and costs well under a rupee per place.
         </p>
+        {aiRead?.cachedAt && (
+          <p className="pdesc">
+            Reused the analysis saved on{" "}
+            {new Date(aiRead.cachedAt).toLocaleString()}. The data has not
+            changed, so nothing was sent to OpenAI and nothing was charged.
+          </p>
+        )}
         {aiBusy && !aiRead && (
           <p className="pdesc" aria-live="polite">
             Writing the AI read for {loc.name}…
