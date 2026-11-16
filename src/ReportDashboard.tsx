@@ -572,7 +572,8 @@ export default function ReportDashboard({
     </th>
   );
 
-  const marketBars = [...report.locations]
+  const marketBars = report.locations
+    .filter((l) => !region || regionOf(l.name) === region)
     .sort((a, b) => b.keywords.size - a.keywords.size)
     .slice(0, 16)
     .map((l) => ({
@@ -972,7 +973,9 @@ export default function ReportDashboard({
         <div className="panel">
           <div className="phead">
             <h3>Demand by market</h3>
-            <span className="meta">top 16, brand share marked</span>
+            <span className="meta">
+              top 16 places{region ? " in " + region : ""}, brand share marked
+            </span>
           </div>
           <p className="pdesc">
             Where the category is searching
