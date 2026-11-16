@@ -740,9 +740,11 @@ function Reports({
   const [message, setMessage] = useState("");
   const [dragging, setDragging] = useState(false);
   const [locationIndex, setLocationIndex] = useState(0);
-  const [aiRead, setAiRead] = useState<StrategicRead | null>(null);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiMessage, setAiMessage] = useState("");
+  const [aiReads, setAiReads] = useState<Map<string, StrategicRead>>(new Map());
+  const [aiLoading, setAiLoading] = useState<string[]>([]);
+  const [aiErrors, setAiErrors] = useState<Map<string, string>>(new Map());
+  const aiInFlight = useRef(new Set<string>());
+  const classifyDone = useRef(false);
   const [placeStatus, setPlaceStatus] = useState("");
   const [placeBusy, setPlaceBusy] = useState(false);
   const resultsRef = useRef<HTMLHeadingElement>(null);
@@ -780,8 +782,9 @@ function Reports({
       return;
     }
     setLocationIndex(0);
-    setAiRead(null);
-    setAiMessage("");
+    setAiReads(new Map());
+    setAiErrors(new Map());
+    classifyDone.current = false;
     classificationInput.current = { sources, brands: brandList };
     setWebsiteLabels(new Map());
     setClassificationError("");
@@ -820,28 +823,34 @@ function Reports({
       );
       return report;
     } finally {
+      classifyDone.current = true;
       setClassifying(false);
     }
   }
-  async function writeStrategicRead(target = report) {
-    if (!target) return;
-    setAiBusy(true);
-    setAiMessage("");
+  async function writeStrategicRead(target = report, index = locationIndex) {
+    const place = target?.locations[index];
+    if (!target || !place || aiInFlight.current.has(place.name)) return;
+    const name = place.name;
+    aiInFlight.current.add(name);
+    setAiLoading([...aiInFlight.current]);
+    setAiErrors((old) => {
+      const next = new Map(old);
+      next.delete(name);
+      return next;
+    });
     let written = false;
     try {
-      setAiRead(
-        await requestStrategicRead(
-          reportFacts(target, target.locations[locationIndex]),
-        ),
-      );
+      const read = await requestStrategicRead(reportFacts(target, place));
+      setAiReads((old) => new Map(old).set(name, read));
       written = true;
     } catch (error) {
-      setAiMessage(
-        error instanceof Error ? error.message : "The strategic read failed.",
-      );
+      const text =
+        error instanceof Error ? error.message : "The strategic read failed.";
+      setAiErrors((old) => new Map(old).set(name, text));
     } finally {
-      setAiBusy(false);
-      if (autoFlow.current || document.hidden) {
+      aiInFlight.current.delete(name);
+      setAiLoading([...aiInFlight.current]);
+      if (index === 0 && (autoFlow.current || document.hidden)) {
         notifyUser(
           "Your keyword report is ready",
           `${target.locations.length} locations, ${format(target.unique)} keywords. ` +
@@ -850,7 +859,7 @@ function Reports({
               : "The AI summary could not be written."),
         );
       }
-      autoFlow.current = false;
+      if (index === 0) autoFlow.current = false;
     }
   }
   async function savePlaces(target = report) {
@@ -872,14 +881,16 @@ function Reports({
     aiAutoFor.current = report;
     const auto = autoFlow.current;
     if (auto && reportSheetId) void savePlaces(report);
-    if (websiteBatch.length) {
-      void classifyWebsiteBatch().then((updated) => {
-        if (auto) void writeStrategicRead(updated);
-      });
-    } else if (auto) {
-      void writeStrategicRead(report);
-    }
+    if (websiteBatch.length) void classifyWebsiteBatch();
   }, [report]);
+  // Write the AI read by itself for whichever place is open, once per place.
+  const openName = report?.locations[locationIndex]?.name ?? "";
+  useEffect(() => {
+    if (!report || !openName || classifying) return;
+    if (websiteBatch.length > 0 && !classifyDone.current) return;
+    if (aiReads.has(openName) || aiErrors.has(openName)) return;
+    void writeStrategicRead(report, locationIndex);
+  }, [report, locationIndex, classifying, aiReads, aiErrors]);
   useEffect(() => {
     if (autoBuild > 0) {
       autoFlow.current = true;
@@ -993,7 +1004,7 @@ function Reports({
                 <Button
                   type="button"
                   onClick={() => buildSheet()}
-                  disabled={busy || aiBusy || classifying}
+                  disabled={busy || aiLoading.length > 0 || classifying}
                 >
                   {busy ? <Loader2 className="spinner" /> : <ArrowRight />}
                   {busy ? "Reading Sheet" : "Build report from public Sheet"}
@@ -1084,7 +1095,7 @@ function Reports({
                   </span>
                   <Button
                     type="submit"
-                    disabled={busy || aiBusy || classifying}
+                    disabled={busy || aiLoading.length > 0 || classifying}
                   >
                     {busy ? (
                       <>
@@ -1119,10 +1130,16 @@ function Reports({
           locationIndex={locationIndex}
           onLocation={setLocationIndex}
           headingRef={resultsRef}
-          aiRead={aiRead}
-          aiBusy={aiBusy || classifying}
-          aiMessage={aiMessage}
-          onWriteAi={() => void writeStrategicRead()}
+          aiRead={aiReads.get(openName) ?? null}
+          aiBusy={aiLoading.includes(openName) || classifying}
+          aiMessage={aiErrors.get(openName) ?? ""}
+          onWriteAi={() => {
+            setAiErrors((old) => {
+              const next = new Map(old);
+              next.delete(openName);
+              return next;
+            });
+          }}
           actions={
             <div className="sheet-report-actions">
               <DownloadButton
@@ -1146,7 +1163,7 @@ function Reports({
                 onClick={() =>
                   downloadClaudeBundle(report, {
                     sheetId: reportSheetId,
-                    strategicRead: aiRead,
+                    strategicRead: aiReads.get(openName) ?? null,
                   })
                 }
               >

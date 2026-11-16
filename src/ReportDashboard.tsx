@@ -186,14 +186,55 @@ function MonthBars({
   );
 }
 
+type Zone = "sweet" | "crowded" | "niche" | "skip";
+const ZONES: { id: Zone; name: string; hint: string }[] = [
+  {
+    id: "sweet",
+    name: "Sweet spot",
+    hint: "1,000+ searches, few advertisers. Content can win cheaply.",
+  },
+  {
+    id: "crowded",
+    name: "Crowded",
+    hint: "1,000+ searches, many advertisers. Expect to pay more.",
+  },
+  {
+    id: "niche",
+    name: "Small and cheap",
+    hint: "Under 1,000 searches, few advertisers. Low effort, small reward.",
+  },
+  {
+    id: "skip",
+    name: "Low value",
+    hint: "Under 1,000 searches, many advertisers. Usually not worth it.",
+  },
+];
+const zoneOf = (r: Row): Zone => {
+  const high = r.volume >= 1000;
+  const busy = (r.competition as number) >= 50;
+  return high ? (busy ? "crowded" : "sweet") : busy ? "skip" : "niche";
+};
+
 function OpportunityMap({ rows }: { rows: Row[] }) {
-  const points = useMemo(() => {
-    const valid = rows.filter((row) => row.competition !== null);
-    return valid.sort((a, b) => b.volume - a.volume).slice(0, 800);
-  }, [rows]);
+  const [zone, setZone] = useState<Zone | "">("");
+  const [pinned, setPinned] = useState<Row | null>(null);
+  const [hover, setHover] = useState<Row | null>(null);
+  const points = useMemo(
+    () =>
+      rows
+        .filter((row) => row.competition !== null)
+        .sort((a, b) => b.volume - a.volume),
+    [rows],
+  );
+  const plotted = useMemo(() => points.slice(0, 800), [points]);
+  const counts = useMemo(() => {
+    const c: Record<Zone, number> = { sweet: 0, crowded: 0, niche: 0, skip: 0 };
+    for (const p of points) c[zoneOf(p)]++;
+    return c;
+  }, [points]);
   const w = 620;
-  const h = 300;
-  const pad = { l: 44, r: 12, t: 10, b: 30 };
+  const h = 340;
+  const pad = { l: 56, r: 12, t: 12, b: 44 };
   const maxLog =
     Math.log10(Math.max(1000, ...points.map((p) => p.volume))) + 0.1;
   const minLog = 2;
@@ -205,72 +246,206 @@ function OpportunityMap({ rows }: { rows: Row[] }) {
   const ticks = [100, 1000, 10000, 100000, 1000000].filter(
     (t) => Math.log10(t) <= maxLog,
   );
+  const label = (t: number) =>
+    t >= 1000000
+      ? "10L"
+      : t >= 100000
+        ? "1L"
+        : t >= 1000
+          ? t / 1000 + "k"
+          : "" + t;
+  const shown = hover ?? pinned;
+  const list = zone
+    ? points.filter((p) => zoneOf(p) === zone).slice(0, 10)
+    : [];
+  const split = y(1000);
   return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="chart"
-      role="img"
-      aria-label="Keywords by search volume and advertiser competition"
-    >
-      <rect
-        x={x(0)}
-        y={pad.t}
-        width={x(50) - x(0)}
-        height={y(1000) - pad.t}
-        className="band"
-      />
-      {ticks.map((t) => (
-        <g key={t}>
-          <line
-            x1={pad.l}
-            x2={w - pad.r}
-            y1={y(t)}
-            y2={y(t)}
-            className="grid"
-          />
+    <div className="opp">
+      <div className="zones" role="group" aria-label="Filter by zone">
+        {ZONES.map((z) => (
+          <button
+            key={z.id}
+            type="button"
+            className={"zone z-" + z.id + (zone === z.id ? " on" : "")}
+            aria-pressed={zone === z.id}
+            onClick={() => setZone(zone === z.id ? "" : z.id)}
+          >
+            <b>{z.name}</b>
+            <span className="zn">{fmt(counts[z.id])} keywords</span>
+            <span className="zh">{z.hint}</span>
+          </button>
+        ))}
+      </div>
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className="chart"
+        role="img"
+        aria-label="Keywords by search volume and advertiser competition"
+      >
+        <rect
+          x={x(0)}
+          y={pad.t}
+          width={x(50) - x(0)}
+          height={split - pad.t}
+          className="band"
+        />
+        {ticks.map((t) => (
+          <g key={t}>
+            <line
+              x1={pad.l}
+              x2={w - pad.r}
+              y1={y(t)}
+              y2={y(t)}
+              className="grid"
+            />
+            <text
+              x={pad.l - 6}
+              y={y(t) + 3}
+              textAnchor="end"
+              className="chart-axis"
+            >
+              {label(t)}
+            </text>
+          </g>
+        ))}
+        <line
+          x1={x(50)}
+          x2={x(50)}
+          y1={pad.t}
+          y2={h - pad.b}
+          className="grid split"
+        />
+        <line
+          x1={pad.l}
+          x2={w - pad.r}
+          y1={split}
+          y2={split}
+          className="grid split"
+        />
+        <text x={x(0) + 6} y={pad.t + 14} className="zone-label">
+          Sweet spot
+        </text>
+        <text
+          x={w - pad.r - 6}
+          y={pad.t + 14}
+          textAnchor="end"
+          className="zone-label"
+        >
+          Crowded
+        </text>
+        <text x={x(0) + 6} y={h - pad.b - 6} className="zone-label">
+          Small and cheap
+        </text>
+        <text
+          x={w - pad.r - 6}
+          y={h - pad.b - 6}
+          textAnchor="end"
+          className="zone-label"
+        >
+          Low value
+        </text>
+        {[0, 25, 50, 75, 100].map((c) => (
           <text
-            x={pad.l - 6}
-            y={y(t) + 3}
-            textAnchor="end"
+            key={c}
+            x={x(c)}
+            y={h - pad.b + 14}
+            textAnchor="middle"
             className="chart-axis"
           >
-            {t >= 1000000
-              ? "10L"
-              : t >= 100000
-                ? "1L"
-                : t >= 1000
-                  ? t / 1000 + "k"
-                  : t}
+            {c}
           </text>
-        </g>
-      ))}
-      {[0, 25, 50, 75, 100].map((c) => (
+        ))}
         <text
-          key={c}
-          x={x(c)}
-          y={h - 10}
+          x={(pad.l + w - pad.r) / 2}
+          y={h - 6}
           textAnchor="middle"
-          className="chart-axis"
+          className="axis-title"
         >
-          {c}
+          Advertisers bidding: few ← → many (0 to 100)
         </text>
-      ))}
-      {points.map((p) => (
-        <circle
-          key={p.keyword}
-          cx={x(p.competition as number)}
-          cy={y(p.volume)}
-          r="2.6"
-          className={
-            p.volume >= 1000 && (p.competition as number) < 50
-              ? "dot open"
-              : "dot"
-          }
+        <text
+          transform={`translate(12 ${(pad.t + h - pad.b) / 2}) rotate(-90)`}
+          textAnchor="middle"
+          className="axis-title"
         >
-          <title>{`${p.keyword}: ${fmt(p.volume)} searches, competition ${p.competition}`}</title>
-        </circle>
-      ))}
-    </svg>
+          Monthly searches (log scale)
+        </text>
+        {plotted.map((p) => {
+          const z = zoneOf(p);
+          const dim = zone && zone !== z;
+          return (
+            <circle
+              key={p.keyword}
+              cx={x(p.competition as number)}
+              cy={y(p.volume)}
+              r={pinned === p ? 6 : 3.4}
+              className={"dot z-" + z + (dim ? " dim" : "")}
+              tabIndex={dim ? -1 : 0}
+              onMouseEnter={() => setHover(p)}
+              onMouseLeave={() => setHover(null)}
+              onFocus={() => setHover(p)}
+              onBlur={() => setHover(null)}
+              onClick={() => setPinned(pinned === p ? null : p)}
+            >
+              <title>{`${p.keyword}: ${fmt(p.volume)} searches, competition ${p.competition}`}</title>
+            </circle>
+          );
+        })}
+      </svg>
+      <div className="opp-detail" aria-live="polite">
+        {shown ? (
+          <>
+            <b>{shown.keyword}</b>
+            <span>{fmt(shown.volume)} searches a month</span>
+            <span>Competition {shown.competition} of 100</span>
+            <span>
+              Bid {rupees(shown.lowBidInr)} to {rupees(shown.highBidInr)} per
+              click
+            </span>
+            <span className={"pill z-" + zoneOf(shown)}>
+              {ZONES.find((z) => z.id === zoneOf(shown))?.name}
+            </span>
+          </>
+        ) : (
+          <span>
+            Hover or tap a dot to read it. Pick a zone above to list its best
+            keywords.
+          </span>
+        )}
+      </div>
+      {zone && (
+        <div className="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Top keywords in this zone</th>
+                <th>Searches</th>
+                <th>Competition</th>
+                <th>Bid (low to high)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((p) => (
+                <tr key={p.keyword}>
+                  <td>{p.keyword}</td>
+                  <td className="num">{fmt(p.volume)}</td>
+                  <td className="num">{p.competition}</td>
+                  <td className="num">
+                    {rupees(p.lowBidInr)} to {rupees(p.highBidInr)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {points.length > plotted.length && (
+        <p className="pdesc">
+          The map draws the {fmt(plotted.length)} biggest of{" "}
+          {fmt(points.length)} keywords. Zone counts use all of them.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -684,7 +859,9 @@ export default function ReportDashboard({
                 onClick={() => setRegion(region === r.name ? "" : r.name)}
               >
                 <b>{r.name}</b>
-                <span>{r.places.length} places</span>
+                <span>
+                  {r.places.length} {r.places.length === 1 ? "place" : "places"}
+                </span>
                 <span>{fmt(r.keywords)} distinct keywords</span>
                 {r.top && (
                   <span>
@@ -785,7 +962,7 @@ export default function ReportDashboard({
       </div>
 
       <div className="grid">
-        <div className="panel">
+        <div className="panel wide">
           <div className="phead">
             <h3>Demand over time</h3>
             <span className="meta">
@@ -793,7 +970,8 @@ export default function ReportDashboard({
             </span>
           </div>
           <p className="pdesc">
-            The shape matters more than the number.{" "}
+            Each bar is one month. A bar at 100 is the same level as December
+            2025; taller means more searches that month, shorter means fewer.{" "}
             {seasonal.length < 12
               ? `${seasonal.length} months cannot separate a festive peak from category growth, so read direction, not season.`
               : "Twelve months or more allows a seasonal read."}
@@ -814,15 +992,15 @@ export default function ReportDashboard({
             <p className="pdesc">No dated month columns were found.</p>
           )}
         </div>
-        <div className="panel">
+        <div className="panel wide">
           <div className="phead">
             <h3>Opportunity map</h3>
-            <span className="meta">volume against competition</span>
+            <span className="meta">which keywords are worth going after</span>
           </div>
           <p className="pdesc">
-            Each dot is a keyword. Up means more people searching. Left means
-            fewer advertisers bidding. The shaded band is where content wins
-            cheaply.
+            Each dot is one keyword. Higher means more people search for it.
+            Further left means fewer advertisers are bidding on it. Start with
+            the green Sweet spot.
           </p>
           <div className="note">
             <b>Build note</b>x is the competition index (0 to 100, advertisers
@@ -983,17 +1161,21 @@ export default function ReportDashboard({
         </div>
         <p className="pdesc">
           Written from the calculated summary and keyword examples for{" "}
-          {loc.name}. It goes to OpenAI and costs well under a rupee per report.
+          {loc.name}. It goes to OpenAI and costs well under a rupee per place.
         </p>
-        <button
-          type="button"
-          className="btn"
-          disabled={aiBusy}
-          onClick={onWriteAi}
-        >
-          {aiBusy ? "Writing…" : aiRead ? "Write again" : "Write AI read"}
-        </button>
-        {aiMessage && <p className="warnbox">{aiMessage}</p>}
+        {aiBusy && !aiRead && (
+          <p className="pdesc" aria-live="polite">
+            Writing the AI read for {loc.name}…
+          </p>
+        )}
+        {aiMessage && (
+          <p className="warnbox">
+            {aiMessage}{" "}
+            <button type="button" className="btn" onClick={onWriteAi}>
+              Try again
+            </button>
+          </p>
+        )}
         {aiRead && (
           <div className="ai">
             {aiRead.items.map((item, i) => (
