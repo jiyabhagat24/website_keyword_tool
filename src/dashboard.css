@@ -713,3 +713,9 @@
 .dash .chart .band {
   fill: rgba(31, 138, 76, 0.1);
 }
+.dash .brand .place {
+  color: var(--s2);
+}
+.dash #place-view {
+  scroll-margin-top: 150px;
+}

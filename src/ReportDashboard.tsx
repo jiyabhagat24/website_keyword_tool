@@ -775,6 +775,7 @@ export default function ReportDashboard({
           <div className="brand">
             <h2 id="report-title" tabIndex={-1} ref={headingRef}>
               Search Demand Monitor
+              <span className="place"> · {loc.name}</span>
             </h2>
             <span className="sub">
               Keyword Planner · {report.locations.length} markets ·{" "}
@@ -843,7 +844,9 @@ export default function ReportDashboard({
                 setOpenKeyword("");
                 setIntentFilter("");
                 setBrandFilter("");
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                document
+                  .getElementById("place-view")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
             >
               Open India overview
@@ -918,7 +921,12 @@ export default function ReportDashboard({
                               setOpenKeyword("");
                               setIntentFilter("");
                               setBrandFilter("");
-                              window.scrollTo({ top: 0, behavior: "smooth" });
+                              document
+                                .getElementById("place-view")
+                                ?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "start",
+                                });
                             }}
                           >
                             Open full data
@@ -936,7 +944,7 @@ export default function ReportDashboard({
 
       <div className="panel summary">
         <div className="phead">
-          <h3>What this market is telling us</h3>
+          <h3 id="place-view">What {loc.name} is telling us</h3>
           <span className="meta">calculated from the selected market</span>
         </div>
         <p className="pdesc">
