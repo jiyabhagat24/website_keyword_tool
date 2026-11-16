@@ -16,7 +16,7 @@
         "authentication": "none",
         "responseMode": "responseNode",
         "options": {
-          "allowedOrigins": "https://YOUR-WEBSITE-ORIGIN"
+          "allowedOrigins": "https://website-keyword-tool.vercel.app,http://localhost:5173,http://127.0.0.1:5199"
         }
       },
       "webhookId": "bc7700e1-0785-4bad-a9d3-0601abbfea69"
