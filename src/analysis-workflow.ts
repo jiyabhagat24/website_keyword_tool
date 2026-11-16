@@ -1,8 +1,11 @@
+import { getSavedLabels, getSavedRead, saveLabels, saveRead } from "./ai-cache";
 import { ANALYSIS_WEBHOOK_URL } from "./config";
 export interface StrategicRead {
   items: { section: string; observation: string; hypothesis: string }[];
   caveats: string[];
   model: string;
+  /** Set when this read was reused from an earlier run on identical data. */
+  cachedAt?: string;
 }
 
 export const websiteIntents = [
@@ -24,7 +27,7 @@ export type WebsiteKeywordLabel = {
   intent: string;
 };
 
-export async function classifyWebsiteKeywords(
+async function classifyFromWorkflow(
   hosts: string[],
   keywords: string[],
   sovCategory = "",
@@ -92,8 +95,37 @@ export async function classifyWebsiteKeywords(
   return labels;
 }
 
-/** Sends calculated facts and selected keyword examples for AI hypotheses. */
+/** Labels keywords, paying only for ones not already labelled with this category and these sites. */
+export async function classifyWebsiteKeywords(
+  hosts: string[],
+  keywords: string[],
+  sovCategory = "",
+) {
+  const scope = sovCategory + "|" + [...hosts].sort().join(",");
+  const labels = getSavedLabels<WebsiteKeywordLabel>(scope, keywords);
+  const missing = keywords.filter((keyword) => !labels.has(keyword));
+  if (missing.length) {
+    const fresh = await classifyFromWorkflow(hosts, missing, sovCategory);
+    saveLabels(scope, fresh);
+    for (const [keyword, label] of fresh) labels.set(keyword, label);
+  }
+  if (!labels.size) throw new Error("The AI returned no valid keyword labels.");
+  return labels;
+}
+
+/** Reuses the saved read when the calculated facts have not changed. */
 export async function requestStrategicRead(
+  facts: unknown,
+): Promise<StrategicRead> {
+  const saved = await getSavedRead<StrategicRead>(facts);
+  if (saved) return saved;
+  const read = await requestStrategicReadFromWorkflow(facts);
+  await saveRead(facts, read);
+  return read;
+}
+
+/** Sends calculated facts and selected keyword examples for AI hypotheses. */
+async function requestStrategicReadFromWorkflow(
   facts: unknown,
 ): Promise<StrategicRead> {
   const endpoint =
