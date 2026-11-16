@@ -494,7 +494,6 @@ export default function ReportDashboard({
     });
   }
 
-  const [showNotes, setShowNotes] = useState(false);
   const [q, setQ] = useState("");
   const [intentFilter, setIntentFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
@@ -595,10 +594,7 @@ export default function ReportDashboard({
   const noIntent = intentCounts.get("No intent tag") ?? 0;
 
   return (
-    <section
-      className={"dash" + (showNotes ? " notes" : "")}
-      aria-labelledby="report-title"
-    >
+    <section className="dash" aria-labelledby="report-title">
       <div className="bar">
         <div className="bar-in">
           <div className="brand">
@@ -610,56 +606,7 @@ export default function ReportDashboard({
               {fmt(report.unique)} keywords
             </span>
           </div>
-          <div className="ctrls">
-            <div className="field">
-              <label htmlFor="dash-market">Market</label>
-              <select
-                id="dash-market"
-                value={locationIndex}
-                onChange={(e) => {
-                  onLocation(Number(e.target.value));
-                  setPage(0);
-                  setOpenKeyword("");
-                  setIntentFilter("");
-                  setBrandFilter("");
-                }}
-              >
-                {groups.national.map(({ l, i }) => (
-                  <option key={l.name} value={i}>
-                    {l.name}
-                  </option>
-                ))}
-                {regionData.list.map((r) => (
-                  <optgroup key={r.name} label={r.name}>
-                    {r.places.map(({ l, i }) => (
-                      <option key={l.name} value={i}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-                {regionData.other.length > 0 && (
-                  <optgroup label="Other">
-                    {regionData.other.map(({ l, i }) => (
-                      <option key={l.name} value={i}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </div>
-            <button
-              type="button"
-              className="toggle"
-              aria-pressed={showNotes}
-              onClick={() => setShowNotes(!showNotes)}
-            >
-              <span className="dot" />
-              Build notes
-            </button>
-            {actions}
-          </div>
+          <div className="ctrls">{actions}</div>
         </div>
       </div>
 
@@ -711,6 +658,22 @@ export default function ReportDashboard({
             <h3>Regions</h3>
             <span className="meta">pick a region to see every place in it</span>
           </div>
+          {groups.national[0] && (
+            <button
+              type="button"
+              className="toggle"
+              onClick={() => {
+                onLocation(groups.national[0].i);
+                setPage(0);
+                setOpenKeyword("");
+                setIntentFilter("");
+                setBrandFilter("");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              Open India overview
+            </button>
+          )}
           <div className="regions" role="group" aria-label="Region">
             {regionData.list.map((r) => (
               <button

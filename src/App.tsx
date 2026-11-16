@@ -868,12 +868,15 @@ function Reports({
     }
   }
   useEffect(() => {
-    if (!report || !autoFlow.current || aiAutoFor.current === report) return;
+    if (!report || aiAutoFor.current === report) return;
     aiAutoFor.current = report;
-    if (reportSheetId) void savePlaces(report);
+    const auto = autoFlow.current;
+    if (auto && reportSheetId) void savePlaces(report);
     if (websiteBatch.length) {
-      void classifyWebsiteBatch().then(writeStrategicRead);
-    } else {
+      void classifyWebsiteBatch().then((updated) => {
+        if (auto) void writeStrategicRead(updated);
+      });
+    } else if (auto) {
       void writeStrategicRead(report);
     }
   }, [report]);
@@ -1164,47 +1167,12 @@ function Reports({
           }
           classifyArea={
             <div className="csv-alternative">
-              <SovCategory
-                id="report-sov-category"
-                value={sovCategory}
-                disabled={busy || classifying || aiBusy}
-                onChange={(value) => {
-                  setSovCategory(value);
-                  setWebsiteLabels(new Map());
-                  setClassificationError("");
-                  setAiRead(null);
-                  if (!classificationInput.current || !websiteLabels.size)
-                    return;
-                  const { sources, brands } = classificationInput.current;
-                  const updated = reportBuild(sources, brands);
-                  aiAutoFor.current = updated;
-                  setReport(updated);
-                }}
-              />
-              <p className="helper">
-                Select a category to give AI the TBMSOV brand list.
-                Classification uses your keywords and any source domains. OpenAI
-                usage may incur charges.
-              </p>
               {websiteLabels.size > 0 && (
                 <p className="helper" aria-live="polite">
                   AI checked {format(websiteLabels.size)} of{" "}
                   {format(report.unique)} distinct keywords. Review the
                   suggested labels in the explorer.
                 </p>
-              )}
-              {websiteBatch.length > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={classifyWebsiteBatch}
-                  disabled={classifying || aiBusy}
-                >
-                  <Sparkles />
-                  {classifying
-                    ? "Classifying…"
-                    : `Classify ${websiteBatch.length} keywords with AI`}
-                </Button>
               )}
               {classificationError && (
                 <Alert variant="destructive">
