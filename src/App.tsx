@@ -758,15 +758,14 @@ function Reports({
     new Map<string, WebsiteKeywordLabel>(),
   );
   const [classifying, setClassifying] = useState(false);
+  const [classifyProgress, setClassifyProgress] = useState("");
   const [classificationError, setClassificationError] = useState("");
   const location = report?.locations[locationIndex];
   const websiteBatch = useMemo(() => {
     if (!report || (!report.websiteHosts.length && !sovCategory)) return [];
     return [
       ...new Set(report.locations.flatMap((item) => [...item.keywords.keys()])),
-    ]
-      .filter((keyword) => !websiteLabels.has(keyword) && keyword.length <= 160)
-      .slice(0, 100);
+    ].filter((keyword) => !websiteLabels.has(keyword) && keyword.length <= 160);
   }, [report, websiteLabels, sovCategory]);
   function applySources(
     sources: { name: string; text?: string; error?: string }[],
@@ -797,33 +796,53 @@ function Reports({
     if (!report || !input || !websiteBatch.length || classifying) return report;
     setClassifying(true);
     setClassificationError("");
+    const labels = new Map(websiteLabels);
+    const chunks: string[][] = [];
+    for (let i = 0; i < websiteBatch.length; i += 100)
+      chunks.push(websiteBatch.slice(i, i + 100));
+    let failure = "";
     try {
-      const labels = await classifyWebsiteKeywords(
-        report.websiteHosts.slice(0, 20),
-        websiteBatch,
-        sovCategory,
-      );
-      if (classificationInput.current !== input) return;
-      const combined = new Map([...websiteLabels, ...labels]);
+      // Three batches at a time keeps a large sheet fast without flooding the workflow.
+      for (let i = 0; i < chunks.length && !failure; i += 3) {
+        setClassifyProgress(
+          `${Math.min(i * 100, websiteBatch.length)} of ${websiteBatch.length}`,
+        );
+        const group = chunks.slice(i, i + 3);
+        const results = await Promise.allSettled(
+          group.map((chunk) =>
+            classifyWebsiteKeywords(
+              report.websiteHosts.slice(0, 20),
+              chunk,
+              sovCategory,
+            ),
+          ),
+        );
+        if (classificationInput.current !== input) return;
+        for (const result of results) {
+          if (result.status === "fulfilled")
+            for (const [k, v] of result.value) labels.set(k, v);
+          else if (!failure)
+            failure =
+              result.reason instanceof Error
+                ? result.reason.message
+                : "Website classification failed.";
+        }
+      }
+      if (failure) setClassificationError(failure);
+      if (labels.size === websiteLabels.size) return report;
       const updated = reportBuild(
         input.sources,
         input.brands,
         LOCATIONS,
-        combined,
+        labels,
       );
       aiAutoFor.current = updated;
-      setWebsiteLabels(combined);
+      setWebsiteLabels(labels);
       setReport(updated);
       return updated;
-    } catch (error) {
-      setClassificationError(
-        error instanceof Error
-          ? error.message
-          : "Website classification failed.",
-      );
-      return report;
     } finally {
       classifyDone.current = true;
+      setClassifyProgress("");
       setClassifying(false);
     }
   }
@@ -1184,6 +1203,11 @@ function Reports({
           }
           classifyArea={
             <div className="csv-alternative">
+              {classifying && classifyProgress && (
+                <p className="helper" aria-live="polite">
+                  AI is labelling keywords: {classifyProgress}…
+                </p>
+              )}
               {websiteLabels.size > 0 && (
                 <p className="helper" aria-live="polite">
                   AI checked {format(websiteLabels.size)} of{" "}
