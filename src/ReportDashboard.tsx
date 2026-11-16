@@ -9,6 +9,7 @@ import {
   reportTrendMovers,
 } from "../keyword-report";
 import type { StrategicRead } from "./analysis-workflow";
+import { REGIONS, regionOf, type Region } from "./regions";
 import "./dashboard.css";
 
 type Report = ReturnType<typeof reportBuild>;
@@ -28,25 +29,6 @@ interface Row {
   intents: number[];
   sheetIntent: string;
 }
-
-const CITY_PARENTS = new Set([
-  "bengaluru",
-  "cmr",
-  "coimbatore",
-  "hyderabad",
-  "mmr",
-  "pmr",
-  "nagpur",
-  "amr",
-  "kmr",
-  "jaipur",
-  "lucknow",
-  "indore",
-  "kochi",
-  "ernakulam",
-  "thiruvananthapuram",
-  "delhi ncr",
-]);
 
 const INTENT_MEANING: Record<string, string> = {
   Branded: "names a tracked brand",
@@ -392,22 +374,33 @@ export default function ReportDashboard({
     )
     .sort((a, b) => b.volume - a.volume);
 
-  const groups = useMemo(() => {
-    const national = report.locations
+  const groups = useMemo(
+    () => ({
+      national: report.locations
+        .map((l, i) => ({ l, i }))
+        .filter(({ l }) => l.name.toLowerCase() === "india"),
+    }),
+    [report],
+  );
+
+  const regionData = useMemo(() => {
+    const list = REGIONS.map((name) => {
+      const places = report.locations
+        .map((l, i) => ({ l, i }))
+        .filter(({ l }) => regionOf(l.name) === name);
+      const union = new Map<string, number>();
+      for (const { l } of places)
+        for (const r of l.keywords.values() as Iterable<Row>)
+          union.set(r.keyword, Math.max(union.get(r.keyword) ?? 0, r.volume));
+      const top = [...union.entries()].sort((a, b) => b[1] - a[1])[0];
+      return { name, places, keywords: union.size, top };
+    }).filter((r) => r.places.length > 0);
+    const other = report.locations
       .map((l, i) => ({ l, i }))
-      .filter(({ l }) => l.name.toLowerCase() === "india");
-    const cities = report.locations
-      .map((l, i) => ({ l, i }))
-      .filter(({ l }) => CITY_PARENTS.has(l.name.toLowerCase()));
-    const states = report.locations
-      .map((l, i) => ({ l, i }))
-      .filter(
-        ({ l }) =>
-          l.name.toLowerCase() !== "india" &&
-          !CITY_PARENTS.has(l.name.toLowerCase()),
-      );
-    return { national, states, cities };
+      .filter(({ l }) => l.name.toLowerCase() !== "india" && !regionOf(l.name));
+    return { list, other };
   }, [report]);
+  const activeRegion = regionData.list.find((r) => r.name === region);
 
   const lines: { tag: string; text: ReactNode }[] = [];
   if (sorted[0]) {
@@ -501,6 +494,7 @@ export default function ReportDashboard({
   }
 
   const [showNotes, setShowNotes] = useState(false);
+  const [region, setRegion] = useState<Region | "">("");
   const [q, setQ] = useState("");
   const [intentFilter, setIntentFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
@@ -634,18 +628,18 @@ export default function ReportDashboard({
                     {l.name}
                   </option>
                 ))}
-                {groups.states.length > 0 && (
-                  <optgroup label="States and UTs">
-                    {groups.states.map(({ l, i }) => (
+                {regionData.list.map((r) => (
+                  <optgroup key={r.name} label={r.name}>
+                    {r.places.map(({ l, i }) => (
                       <option key={l.name} value={i}>
                         {l.name}
                       </option>
                     ))}
                   </optgroup>
-                )}
-                {groups.cities.length > 0 && (
-                  <optgroup label="Cities and metro regions">
-                    {groups.cities.map(({ l, i }) => (
+                ))}
+                {regionData.other.length > 0 && (
+                  <optgroup label="Other">
+                    {regionData.other.map(({ l, i }) => (
                       <option key={l.name} value={i}>
                         {l.name}
                       </option>
@@ -709,6 +703,95 @@ export default function ReportDashboard({
           <span className="d">volume over 1,000, competition under 50</span>
         </div>
       </div>
+
+      {regionData.list.length > 0 && (
+        <div className="panel">
+          <div className="phead">
+            <h3>Regions</h3>
+            <span className="meta">pick a region to see every place in it</span>
+          </div>
+          <div className="regions" role="group" aria-label="Region">
+            {regionData.list.map((r) => (
+              <button
+                key={r.name}
+                type="button"
+                className={"region" + (region === r.name ? " on" : "")}
+                aria-pressed={region === r.name}
+                onClick={() => setRegion(region === r.name ? "" : r.name)}
+              >
+                <b>{r.name}</b>
+                <span>{r.places.length} places</span>
+                <span>{fmt(r.keywords)} distinct keywords</span>
+                {r.top && (
+                  <span>
+                    Top: {r.top[0]} ({fmt(r.top[1])})
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          {activeRegion && (
+            <div className="tablewrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Place</th>
+                    <th>Keywords with demand</th>
+                    <th>Top keyword</th>
+                    <th>Top searches</th>
+                    <th>Branded %</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeRegion.places.map(({ l, i }) => {
+                    const ks = [...l.keywords.values()] as unknown as Row[];
+                    const top = ks.reduce<Row | undefined>(
+                      (b, r) => (!b || r.volume > b.volume ? r : b),
+                      undefined,
+                    );
+                    const branded = ks.filter((r) => r.brand === "Branded");
+                    return (
+                      <tr
+                        key={l.name}
+                        className={i === locationIndex ? "cur" : ""}
+                      >
+                        <td>{l.name}</td>
+                        <td className="num">{fmt(ks.length)}</td>
+                        <td>{top?.keyword ?? ""}</td>
+                        <td className="num">{top ? fmt(top.volume) : ""}</td>
+                        <td className="num">
+                          {report.hasBrandLabels && ks.length
+                            ? fmt(
+                                Math.round((branded.length / ks.length) * 100),
+                              ) + "%"
+                            : ""}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="toggle"
+                            onClick={() => {
+                              onLocation(i);
+                              setPage(0);
+                              setOpenKeyword("");
+                              setIntentFilter("");
+                              setBrandFilter("");
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
+                          >
+                            Open full data
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="panel summary">
         <div className="phead">
@@ -1166,94 +1249,6 @@ export default function ReportDashboard({
           </div>
         </div>
       )}
-      <div className="panel contract">
-        <div className="phead">
-          <h3>How this gets built</h3>
-          <span className="meta">data contract</span>
-        </div>
-        <div className="grid">
-          <div>
-            <h4>The swap point</h4>
-            <pre>{`Sheet tabs  India, 47 state and city tabs, Keyword input
-Each tab    Keyword | search volume | competition index
-            low bid | high bid | one column per month
-Keyword input  Keyword | Intent | Brand (optional)`}</pre>
-            <p>
-              Refill the Sheet from a fresh collection and the whole page
-              updates, summary included. Nothing in the layout has to change.
-            </p>
-            <h4>Where each number comes from</h4>
-            <div className="maprow">
-              <code>volume</code>
-              <span>
-                Average monthly searches. Banded by Google, so it is a tier and
-                never a sum.
-              </span>
-            </div>
-            <div className="maprow">
-              <code>competition</code>
-              <span>
-                Counts advertisers bidding, not how hard a keyword is to rank
-                for.
-              </span>
-            </div>
-            <div className="maprow">
-              <code>bids</code>
-              <span>
-                What advertisers offer per click, in rupees. Not what they
-                spend.
-              </span>
-            </div>
-            <div className="maprow">
-              <code>months</code>
-              <span>
-                One sheet column per month. Search level is the median
-                per-keyword trend with the first month = 100.
-              </span>
-            </div>
-            <div className="maprow">
-              <code>intent</code>
-              <span>
-                Rules on the words in the phrase. Brands come from the list you
-                give. Keep the rules auditable.
-              </span>
-            </div>
-          </div>
-          <div>
-            <h4>What this data cannot do</h4>
-            <div className="maprow">
-              <code>not sales</code>
-              <span>
-                Search demand only. High search with flat sales is a conversion
-                problem.
-              </span>
-            </div>
-            <div className="maprow">
-              <code>not video</code>
-              <span>
-                Google search only. Recipe and how-to demand also lives on
-                YouTube.
-              </span>
-            </div>
-            <div className="maprow">
-              <code>not SEO</code>
-              <span>
-                A keyword at competition 1 can still be hard to rank for
-                organically.
-              </span>
-            </div>
-            {report.seedCount > 0 && (
-              <div className="maprow">
-                <code>dead seeds</code>
-                <span>
-                  Of {fmt(report.seedCount)} starting keywords only{" "}
-                  {fmt(report.seedHits)} returned demand.
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </section>
   );
 }
