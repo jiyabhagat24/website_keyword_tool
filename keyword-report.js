@@ -1147,7 +1147,108 @@ function reportExportRows(report) {
   ];
 }
 
+const reportIntentAlias = {
+  price: "Price / Buy",
+  doubt: "Question",
+  usage: "How-to",
+};
+const reportPlaceIntents = [
+  "Price / Buy",
+  "Best / Review",
+  "Comparison",
+  "Question",
+  "How-to",
+  "Concern",
+  "Ingredient",
+  "Local",
+];
+
+/** One row per place for the "Place Summary" tab: counts, shares, top keyword, brand and trend. */
+function reportPlaceSummary(report) {
+  const pct = (part, total) =>
+    total ? Number(((100 * part) / total).toFixed(1)) : "";
+  const header = [
+    "Place",
+    "Level",
+    "Keywords with demand",
+    "Top keyword",
+    "Top keyword searches",
+    "Open keywords",
+    "Branded %",
+    "Competitor brand %",
+    "Generic %",
+    ...reportPlaceIntents.map((name) => name + " %"),
+    "Top brand",
+    "Top brand share of branded searches %",
+    "Latest month vs first month %",
+    "Peak month",
+    "City share of its state %",
+  ];
+  const rows = report.locations.map((loc) => {
+    const keywords = [...loc.keywords.values()];
+    const total = keywords.length;
+    const top = keywords.reduce(
+      (best, row) => (!best || row.volume > best.volume ? row : best),
+      null,
+    );
+    const counts = new Map();
+    for (const row of keywords) {
+      const first = reportKeywordIntents(row)[0];
+      const name = first
+        ? (reportIntentAlias[reportNormalize(first)] ?? first)
+        : "";
+      if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    const brandCount = (type) =>
+      keywords.filter((row) => row.brand === type).length;
+    const season = loc.seasonality.filter((month) => month.index !== null);
+    const latest = season.at(-1);
+    const peak = season.reduce(
+      (best, month) => (!best || month.index > best.index ? month : best),
+      null,
+    );
+    const brands = reportBrandRows(loc);
+    const name = reportNormalize(loc.name);
+    const level =
+      name === "india"
+        ? "National"
+        : reportCityParents.has(name)
+          ? "City or metro"
+          : "State or UT";
+    return [
+      loc.name,
+      level,
+      total,
+      top?.keyword ?? "",
+      top?.volume ?? "",
+      keywords.filter(
+        (row) =>
+          row.volume >= 1000 &&
+          row.competition !== null &&
+          row.competition < 50,
+      ).length,
+      pct(brandCount("Branded"), total),
+      pct(brandCount("Competitor brand"), total),
+      pct(brandCount("Generic"), total),
+      ...reportPlaceIntents.map((intent) =>
+        pct(counts.get(intent) ?? 0, total),
+      ),
+      brands[0]?.brand ?? "",
+      brands[0]?.share === null || brands[0] === undefined
+        ? ""
+        : Number(brands[0].share.toFixed(1)),
+      latest ? Number((latest.index - 100).toFixed(1)) : "",
+      peak?.label ?? "",
+      loc.cityState && loc.cityState.volumeShare !== null
+        ? Number(loc.cityState.volumeShare.toFixed(1))
+        : "",
+    ];
+  });
+  return [header, ...rows];
+}
+
 export {
+  reportPlaceSummary,
   reportBuild,
   reportBrandRows,
   reportClassification,
