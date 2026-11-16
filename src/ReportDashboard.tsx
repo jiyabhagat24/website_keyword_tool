@@ -383,6 +383,7 @@ export default function ReportDashboard({
     [report],
   );
 
+  const [region, setRegion] = useState<Region | "">("");
   const regionData = useMemo(() => {
     const list = REGIONS.map((name) => {
       const places = report.locations
@@ -494,7 +495,6 @@ export default function ReportDashboard({
   }
 
   const [showNotes, setShowNotes] = useState(false);
-  const [region, setRegion] = useState<Region | "">("");
   const [q, setQ] = useState("");
   const [intentFilter, setIntentFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
