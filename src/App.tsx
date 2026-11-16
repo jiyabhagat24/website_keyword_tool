@@ -67,6 +67,7 @@ import {
 import type { StrategicRead, WebsiteKeywordLabel } from "./analysis-workflow";
 import { buildClaudeBundle, keywordRows } from "./claude-bundle";
 import ReportDashboard from "./ReportDashboard";
+import { savePlaceSummary } from "./place-summary";
 import { askNotificationPermission, notifyUser } from "./notify";
 import { collectionProgress } from "./watch-sheet";
 import {
@@ -742,6 +743,8 @@ function Reports({
   const [aiRead, setAiRead] = useState<StrategicRead | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
+  const [placeStatus, setPlaceStatus] = useState("");
+  const [placeBusy, setPlaceBusy] = useState(false);
   const resultsRef = useRef<HTMLHeadingElement>(null);
   const autoFlow = useRef(false);
   const aiAutoFor = useRef<Report | null>(null);
@@ -850,9 +853,24 @@ function Reports({
       autoFlow.current = false;
     }
   }
+  async function savePlaces(target = report) {
+    if (!target || !reportSheetId || placeBusy) return;
+    setPlaceBusy(true);
+    setPlaceStatus("Saving the place summary to your Sheet…");
+    try {
+      setPlaceStatus(await savePlaceSummary(reportSheetId, target));
+    } catch (error) {
+      setPlaceStatus(
+        error instanceof Error ? error.message : "The place summary failed.",
+      );
+    } finally {
+      setPlaceBusy(false);
+    }
+  }
   useEffect(() => {
     if (!report || !autoFlow.current || aiAutoFor.current === report) return;
     aiAutoFor.current = report;
+    if (reportSheetId) void savePlaces(report);
     if (websiteBatch.length) {
       void classifyWebsiteBatch().then(writeStrategicRead);
     } else {
@@ -1131,6 +1149,17 @@ function Reports({
               >
                 Export for Claude Code
               </DownloadButton>
+              <DownloadButton
+                onClick={() => void savePlaces()}
+                disabled={!reportSheetId || placeBusy}
+              >
+                {placeBusy ? "Saving…" : "Save place summary to Sheet"}
+              </DownloadButton>
+              {placeStatus && (
+                <span className="sub" aria-live="polite">
+                  {placeStatus}
+                </span>
+              )}
             </div>
           }
           classifyArea={
