@@ -578,3 +578,35 @@
     transition: none !important;
   }
 }
+
+/* regions */
+.dash .regions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.dash .region {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #d8d4cc);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.dash .region span {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.dash .region.on {
+  border-color: currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.dash tr.cur td {
+  font-weight: 600;
+}

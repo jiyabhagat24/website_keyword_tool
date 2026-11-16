@@ -1,4 +1,5 @@
 import { reportPlaceSummary, reportBuild } from "../keyword-report";
+import { regionOf } from "./regions";
 
 type Report = ReturnType<typeof reportBuild>;
 
@@ -11,7 +12,11 @@ export async function savePlaceSummary(
   sheetId: string,
   report: Report,
 ): Promise<string> {
-  const rows = reportPlaceSummary(report);
+  const rows = (reportPlaceSummary(report) as unknown[][]).map((row, i) => [
+    row[0],
+    i === 0 ? "Region" : (regionOf(String(row[0])) ?? ""),
+    ...row.slice(1),
+  ]);
   const response = await fetch(PLACE_SUMMARY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
